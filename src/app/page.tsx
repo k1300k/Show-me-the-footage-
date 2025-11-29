@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useCCTVData } from '@/hooks/useCCTVData';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,21 +20,71 @@ interface Message {
   sender: 'user' | 'system';
 }
 
-// 인기 CCTV 해시태그 목록
-const POPULAR_CCTV_TAGS = [
-  '강남역',
-  '신촌역',
-  '광화문',
-  '서울역',
-  '올림픽대로',
-  '한강대교',
-  '마포대교',
-  '여의도',
-  '잠실',
-  '홍대',
-  '이태원',
-  '명동',
-];
+// CCTV 이름에서 키워드 추출 함수
+const extractKeywordsFromCCTVs = (cctvList: CCTV[]): string[] => {
+  const keywordSet = new Set<string>();
+  
+  cctvList.forEach(cctv => {
+    const name = cctv.name;
+    
+    // 괄호 안의 내용 추출 (예: "서울 강남대로 (논현역)" → "논현역")
+    const parenthesesMatch = name.match(/\(([^)]+)\)/);
+    if (parenthesesMatch) {
+      const inside = parenthesesMatch[1];
+      // 괄호 안에서 역명, 교명 등 추출
+      if (inside.includes('역')) {
+        keywordSet.add(inside.replace('역', '역'));
+      } else if (inside.includes('대교') || inside.includes('교')) {
+        keywordSet.add(inside);
+      } else {
+        keywordSet.add(inside);
+      }
+    }
+    
+    // 주요 도로명 추출
+    const roadPatterns = [
+      /강남대로/, /테헤란로/, /올림픽대로/, /강변북로/, /신촌로/,
+      /서부간선도로/, /여의대로/, /종로/, /세종대로/, /남대문로/,
+      /퇴계로/, /한강대로/, /영등포로/, /경인로/, /노량진로/,
+      /동작대로/, /남부순환로/, /천호대로/, /동부간선도로/,
+      /망우로/, /동일로/, /내부순환로/, /동호로/, /왕산로/,
+      /독산로/, /봉은사로/, /북부간선도로/, /화랑로/, /의정부로/,
+      /도봉로/, /성북로/, /강서로/, /공항대로/, /마곡중앙로/,
+      /양천로/, /신월로/
+    ];
+    
+    roadPatterns.forEach(pattern => {
+      const match = name.match(pattern);
+      if (match) {
+        keywordSet.add(match[0]);
+      }
+    });
+    
+    // 지역명 추출
+    const regionPatterns = [
+      /강남/, /신촌/, /광화문/, /서울역/, /용산/, /영등포/,
+      /구로/, /노량진/, /사당/, /서초/, /강동/, /잠실/,
+      /구리/, /중랑/, /강북/, /성수/, /약수/, /이태원/,
+      /금천/, /선릉/, /월계/, /태릉/, /미아/, /도봉산/,
+      /성북/, /까치산/, /김포/, /마곡/, /목동/, /신정/
+    ];
+    
+    regionPatterns.forEach(pattern => {
+      const match = name.match(pattern);
+      if (match) {
+        keywordSet.add(match[0]);
+      }
+    });
+    
+    // 한강 관련
+    if (name.includes('한강') || name.includes('대교')) {
+      keywordSet.add('한강');
+    }
+  });
+  
+  // 정렬 및 중복 제거
+  return Array.from(keywordSet).sort().slice(0, 15); // 최대 15개
+};
 
 // 간단한 키워드 추출 함수 (자연어 처리)
 const extractKeyword = (text: string): string => {
@@ -83,6 +133,15 @@ export default function HomePage() {
   });
   
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+
+  // CCTV 목록에서 해시태그 키워드 추출
+  const hashtagKeywords = useMemo(() => {
+    if (!allCCTVList || allCCTVList.length === 0) {
+      // 기본 해시태그 (로딩 중이거나 데이터 없을 때)
+      return ['강남역', '신촌역', '광화문', '서울역', '올림픽대로', '한강대교', '마포대교', '여의도', '잠실', '홍대'];
+    }
+    return extractKeywordsFromCCTVs(allCCTVList);
+  }, [allCCTVList]);
 
   useEffect(() => {
     if (allCCTVList) {
@@ -135,7 +194,9 @@ export default function HomePage() {
 
     if (allCCTVList) {
       const results = allCCTVList.filter(cctv => 
-        cctv.name.includes(keyword) || cctv.direction?.includes(keyword)
+        cctv.name.includes(keyword) || 
+        cctv.direction?.includes(keyword) ||
+        keyword.includes(cctv.name.split(' ')[0]) // 첫 단어 매칭
       );
 
       setFilteredCCTVs(results);
@@ -258,18 +319,20 @@ export default function HomePage() {
                 </Button>
               </div>
 
-              {/* 해시태그 영역 */}
+              {/* 해시태그 영역 - CCTV 이름 기반 동적 생성 */}
               <div className="flex-shrink-0">
                 <div className="flex items-center gap-2 mb-2">
                   <Hash className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-500">인기 검색어</span>
+                  <span className="text-xs text-gray-500">
+                    {isLoading ? '로딩 중...' : `추천 검색어 (${hashtagKeywords.length}개)`}
+                  </span>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {POPULAR_CCTV_TAGS.map((tag) => (
+                  {hashtagKeywords.map((tag) => (
                     <button
                       key={tag}
                       onClick={() => handleHashtagClick(tag)}
-                      className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors border border-blue-200"
+                      className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors border border-blue-200 active:scale-95"
                     >
                       #{tag}
                     </button>
@@ -326,7 +389,7 @@ export default function HomePage() {
                             </h3>
                             <p className="text-xs text-gray-500">ID: {cctv.id}</p>
                           </div>
-                        </CardContent>
+                      </CardContent>
                       </Card>
                     ))}
                   </div>
