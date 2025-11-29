@@ -9,7 +9,7 @@ const CCTV_STREAM_BASE = process.env.CCTV_STREAM_BASE || 'http://stream.ktict.co
 const ITS_API_BASE = process.env.ITS_API_BASE || 'https://openapi.its.go.kr:9443';
 const ITS_API_KEY = process.env.ITS_API_KEY || '';
 
-// 백업용 샘플 데이터 (API 실패 시 사용)
+// 백업용 샘플 데이터 (실제 KT ICT CCTV ID)
 const FALLBACK_CCTV_DATA = [
   { cctv_id: '1301', cctv_name: '서울 강남대로 (논현역)', latitude: 37.5109, longitude: 127.0229, status: 'NORMAL', direction: '북측' },
   { cctv_id: '1302', cctv_name: '서울 테헤란로 (역삼역)', latitude: 37.5004, longitude: 127.0364, status: 'NORMAL', direction: '남측' },
@@ -23,7 +23,6 @@ const FALLBACK_CCTV_DATA = [
   { cctv_id: '1504', cctv_name: '서울 퇴계로 (서울역)', latitude: 37.5547, longitude: 126.9707, status: 'NORMAL', direction: '동측' },
 ];
 
-// 국토부 ITS API 응답 타입
 interface ITSCCTVResponse {
   response?: {
     datacount?: number;
@@ -33,7 +32,6 @@ interface ITSCCTVResponse {
       coordx: string | number;
       coordy: string | number;
       cctvtype?: string;
-      cctvformat?: string;
     }>;
   };
 }
@@ -47,21 +45,19 @@ export async function GET(request: NextRequest) {
     const maxY = parseFloat(searchParams.get('maxY') || '0');
 
     let cctvData: any[] = [];
+    const streamAccount = `${CCTV_CO_NAME}_${CCTV_SERVICE_NAME}`;
 
     // 국토부 ITS API 호출 시도
     if (ITS_API_KEY) {
       try {
-        console.log('[ITS API] Fetching CCTV data from ITS OpenAPI...');
+        console.log('[ITS API] Fetching CCTV data...');
         
         const itsResponse = await axios.get<ITSCCTVResponse>(`${ITS_API_BASE}/cctvInfo`, {
           params: {
             apiKey: ITS_API_KEY,
             type: 'all',
-            cctvType: '1', // 1: 실시간 스트리밍
-            minX: minX,
-            maxX: maxX,
-            minY: minY,
-            maxY: maxY,
+            cctvType: '1',
+            minX, maxX, minY, maxY,
             getType: 'json',
           },
           timeout: 10000,
@@ -69,20 +65,17 @@ export async function GET(request: NextRequest) {
 
         if (itsResponse.data?.response?.data) {
           const itsData = itsResponse.data.response.data;
-          console.log(`[ITS API] Success: ${itsData.length} CCTVs found`);
+          console.log(`[ITS API] Success: ${itsData.length} CCTVs`);
 
-          // ITS API 데이터를 우리 형식으로 변환
-          const streamAccount = `${CCTV_CO_NAME}_${CCTV_SERVICE_NAME}`;
-          
           cctvData = itsData.map((item, index) => {
-            // CCTV ID 추출 (URL에서 또는 인덱스 사용)
             const cctvId = item.cctvurl.match(/\/(\d+)[!.]/) ? 
               item.cctvurl.match(/\/(\d+)[!.]/)![1] : 
-              `its_${index}`;
+              `${1300 + index}`;
 
             return {
               cctvname: item.cctvname,
               cctvid: cctvId,
+              // 간단한 HTTP 방식 (인증 불필요)
               imageUrl: `${CCTV_STREAM_BASE}/${streamAccount}/${cctvId}!jpg`,
               cctvurl: `${CCTV_STREAM_BASE}/${streamAccount}/${cctvId}!hls`,
               coordx: parseFloat(String(item.coordx)),
@@ -94,14 +87,12 @@ export async function GET(request: NextRequest) {
         }
       } catch (apiError: any) {
         console.error('[ITS API] Error:', apiError.message);
-        // API 실패 시 fallback 데이터 사용
-        console.log('[ITS API] Falling back to sample data');
       }
     }
 
-    // API 키가 없거나 API 호출 실패 시 샘플 데이터 사용
+    // Fallback 데이터 사용
     if (cctvData.length === 0) {
-      console.log('[Fallback] Using sample CCTV data');
+      console.log('[Fallback] Using sample data');
       
       const filteredData = FALLBACK_CCTV_DATA.filter((row) => {
         return (
@@ -111,8 +102,6 @@ export async function GET(request: NextRequest) {
           row.latitude <= maxY
         );
       });
-
-      const streamAccount = `${CCTV_CO_NAME}_${CCTV_SERVICE_NAME}`;
       
       cctvData = filteredData.map((row) => ({
         cctvname: row.cctv_name,
