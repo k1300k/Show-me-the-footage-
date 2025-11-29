@@ -1,9 +1,295 @@
-import MapContainer from '@/components/map/MapContainer';
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { useCCTVData } from '@/hooks/useCCTVData';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import ImageViewer from '@/components/player/ImageViewer';
+import { CCTV } from '@/types';
+import { Star, Send, MessageSquare, Video } from 'lucide-react';
+import { useFavorites } from '@/hooks/useFavorites';
+
+interface Message {
+  id: string;
+  text: string;
+  timestamp: Date;
+  sender: 'user' | 'system';
+}
+
+export default function HomePage() {
+  const [selectedCCTV, setSelectedCCTV] = useState<CCTV | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: '1',
+      text: '안녕하세요! 전국 CCTV 실시간 영상 서비스입니다.',
+      timestamp: new Date(),
+      sender: 'system',
+    },
+  ]);
+  const [inputMessage, setInputMessage] = useState('');
+
+  // 서울 전역을 커버하는 넓은 범위로 설정
+  const [bounds] = useState({
+    minX: 126.7,
+    maxX: 127.3,
+    minY: 37.4,
+    maxY: 37.7,
+  });
+
+  const { data: cctvList, isLoading } = useCCTVData(bounds);
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+
+  const handleCCTVClick = (cctv: CCTV) => {
+    setSelectedCCTV(cctv);
+    setIsSheetOpen(true);
+    setShowVideo(false);
+    
+    // 시스템 메시지 추가
+    const systemMsg: Message = {
+      id: Date.now().toString(),
+      text: `${cctv.name} CCTV 영상을 확인하고 있습니다.`,
+      timestamp: new Date(),
+      sender: 'system',
+    };
+    setMessages(prev => [...prev, systemMsg]);
+  };
+
+  const toggleFavorite = () => {
+    if (!selectedCCTV) return;
+    if (isFavorite(selectedCCTV.id)) {
+      removeFavorite(selectedCCTV.id);
+    } else {
+      addFavorite(selectedCCTV);
+    }
+  };
+
+  const sendMessage = () => {
+    if (!inputMessage.trim()) return;
+
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      text: inputMessage,
+      timestamp: new Date(),
+      sender: 'user',
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setInputMessage('');
+
+    // 간단한 자동 응답
+    setTimeout(() => {
+      const systemMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        text: '메시지를 확인했습니다. CCTV 영상을 선택해주세요.',
+        timestamp: new Date(),
+        sender: 'system',
+      };
+      setMessages(prev => [...prev, systemMsg]);
+    }, 500);
+  };
+
   return (
-    <main className="w-full h-screen overflow-hidden">
-      <MapContainer />
-    </main>
+    <div className="h-screen flex flex-col bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b shadow-sm p-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">🎥 Show Me The CCTV</h1>
+            <p className="text-sm text-gray-600">실시간 전국 CCTV 모니터링</p>
+          </div>
+          <Badge variant="default" className="bg-green-500">
+            LIVE
+          </Badge>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 overflow-hidden">
+        <div className="h-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+          
+          {/* Left: Message Box */}
+          <Card className="flex flex-col h-full md:col-span-1">
+            <CardHeader className="flex-shrink-0">
+              <CardTitle className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5" />
+                메시지
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 flex flex-col min-h-0 p-4">
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+                {messages.map((msg) => (
+                  <div
+                    key={msg.id}
+                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-lg p-3 ${
+                        msg.sender === 'user'
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-900'
+                      }`}
+                    >
+                      <p className="text-sm">{msg.text}</p>
+                      <p className="text-xs mt-1 opacity-70">
+                        {msg.timestamp.toLocaleTimeString('ko-KR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Input */}
+              <div className="flex gap-2 flex-shrink-0">
+                <Input
+                  placeholder="메시지를 입력하세요..."
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                />
+                <Button size="icon" onClick={sendMessage}>
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Right: CCTV List */}
+          <Card className="md:col-span-2 flex flex-col h-full">
+            <CardHeader className="flex-shrink-0">
+              <CardTitle>CCTV 목록 ({cctvList?.length || 0}개)</CardTitle>
+            </CardHeader>
+            <CardContent className="flex-1 overflow-y-auto p-4">
+              {isLoading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <Card key={i}>
+                      <CardContent className="p-4 space-y-3">
+                        <Skeleton className="h-40 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : cctvList && cctvList.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {cctvList.map((cctv) => (
+                    <Card
+                      key={cctv.id}
+                      className="cursor-pointer hover:shadow-lg transition-shadow"
+                      onClick={() => handleCCTVClick(cctv)}
+                    >
+                      <CardContent className="p-0">
+                        <div className="relative aspect-video bg-gray-900">
+                          <ImageViewer
+                            src={cctv.imageUrl}
+                            alt={cctv.name}
+                            autoRefresh={false}
+                          />
+                          {cctv.status === 'NORMAL' && (
+                            <Badge className="absolute top-2 right-2 bg-green-500">
+                              정상
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="p-3">
+                          <h3 className="font-semibold text-sm truncate">{cctv.name}</h3>
+                          <p className="text-xs text-gray-500">ID: {cctv.id}</p>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-20 text-gray-500">
+                  <p>CCTV 데이터를 불러오는 중입니다...</p>
+                  <p className="text-sm mt-2">잠시만 기다려주세요.</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* CCTV Detail Sheet */}
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent side="bottom" className="h-[70dvh] sm:h-[600px] rounded-t-xl p-0">
+          <div className="p-6 h-full flex flex-col">
+            <SheetHeader className="mb-4 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <SheetTitle>{selectedCCTV?.name || 'CCTV'}</SheetTitle>
+                  {selectedCCTV?.status === 'NORMAL' && (
+                    <Badge variant="default" className="bg-green-500">정상</Badge>
+                  )}
+                </div>
+                <SheetDescription>
+                  {showVideo ? 'LIVE 스트리밍' : '실시간 교통 상황 이미지 (5초마다 갱신)'}
+                </SheetDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowVideo(!showVideo)}
+                  className="text-blue-500 hover:text-blue-600"
+                  title={showVideo ? '이미지 보기' : '영상 보기'}
+                >
+                  <Video className="w-6 h-6" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleFavorite}
+                  className="text-yellow-500 hover:text-yellow-600"
+                >
+                  {selectedCCTV && isFavorite(selectedCCTV.id) ? (
+                    <Star className="w-6 h-6 fill-current" />
+                  ) : (
+                    <Star className="w-6 h-6" />
+                  )}
+                </Button>
+              </div>
+            </SheetHeader>
+            
+            <div className="flex-1 w-full bg-black rounded-lg overflow-hidden relative">
+              {selectedCCTV && isSheetOpen && !showVideo && (
+                <ImageViewer 
+                  src={selectedCCTV.imageUrl} 
+                  alt={selectedCCTV.name}
+                  autoRefresh={true}
+                  refreshInterval={5000}
+                />
+              )}
+              {selectedCCTV && isSheetOpen && showVideo && (
+                <video 
+                  controls 
+                  autoPlay 
+                  playsInline
+                  className="w-full h-full"
+                  src={selectedCCTV.cctvUrl}
+                >
+                  브라우저가 비디오 재생을 지원하지 않습니다.
+                </video>
+              )}
+            </div>
+
+            <div className="mt-4 text-sm text-gray-500">
+              <p>출처: KT ICT CCTV</p>
+              <p className="text-xs mt-1">ID: {selectedCCTV?.id} {selectedCCTV?.direction && `| ${selectedCCTV.direction}`}</p>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+    </div>
   );
 }
