@@ -9,25 +9,21 @@ interface Bounds {
   maxY: number;
 }
 
-// ITS API Response structure (simplified)
-interface ITSResponse {
+// API Response structure
+interface CCTVResponse {
   response: {
-    coordtype: number;
-    data: number; // Count
-    datacount: number;
     data: Array<{
       cctvname: string;
       cctvurl: string;
-      coordx: number; // lng
-      coordy: number; // lat
-      cctvformat: string;
-      cctvtype: number;
+      coordx: number;
+      coordy: number;
+      cctvtype?: number;
     }>;
-  } | null; // Sometimes data is null if no result
+  } | null;
 }
 
 export const fetchCCTVData = async (bounds: Bounds) => {
-  const { data } = await axios.get<ITSResponse>('/api/cctv', {
+  const { data } = await axios.get<CCTVResponse>('/api/cctv', {
     params: {
       minX: bounds.minX,
       maxX: bounds.maxX,
@@ -49,16 +45,16 @@ export const useCCTVData = (bounds: Bounds | null) => {
       if (!data?.response?.data || !Array.isArray(data.response.data)) return [];
       
       return data.response.data.map((item) => ({
-        id: item.cctvurl, // Use URL as ID since ITS doesn't provide clear ID sometimes
+        id: item.cctvurl, // Use URL as ID
         name: item.cctvname,
         coord: {
           lat: item.coordy,
           lng: item.coordx,
         },
         cctvUrl: item.cctvurl,
-        source: 'ITS',
+        imageUrl: item.cctvurl, // 이미지 URL로 사용
+        source: 'SEOUL',
       }));
     },
   });
 };
-

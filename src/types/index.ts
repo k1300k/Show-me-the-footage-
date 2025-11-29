@@ -6,7 +6,7 @@ export interface CCTV {
     lng: number;
   };
   cctvUrl: string;
+  imageUrl?: string; // 썸네일 이미지 URL 추가
   direction?: string;
-  source: 'ITS' | 'EX';
+  source: 'SEOUL' | 'ITS' | 'EX';
 }
-

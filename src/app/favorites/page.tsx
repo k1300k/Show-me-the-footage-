@@ -1,18 +1,15 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useFavorites } from '@/hooks/useFavorites';
-import VideoPlayer from '@/components/player/VideoPlayer';
+import ImageViewer from '@/components/player/ImageViewer';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
 
 export default function FavoritesPage() {
   const { favorites, removeFavorite } = useFavorites();
-  // Simple state to handle client-side rendering to avoid hydration mismatch with localstorage
-  // In a real app, we might use a useEffect to wait for mount, but zustand persist usually handles this if configured right.
-  // However, with Next.js SSR, we need to ensure we only render after mount.
   const [isMounted, setIsMounted] = useState(false);
   
   useEffect(() => {
@@ -54,7 +51,7 @@ export default function FavoritesPage() {
                   </Button>
                 </CardHeader>
                 <CardContent className="p-0 aspect-video bg-black">
-                  <VideoPlayer src={cctv.cctvUrl} autoPlay={false} />
+                  {cctv.imageUrl && <ImageViewer src={cctv.imageUrl} alt={cctv.name} />}
                 </CardContent>
               </Card>
             ))}
@@ -64,4 +61,3 @@ export default function FavoritesPage() {
     </div>
   );
 }
-

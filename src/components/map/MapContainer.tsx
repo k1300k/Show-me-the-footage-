@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { Map, MapMarker, MarkerClusterer, useKakaoLoader } from 'react-kakao-maps-sdk';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useCCTVData } from '@/hooks/useCCTVData';
@@ -15,8 +15,8 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
-import VideoPlayer from '@/components/player/VideoPlayer';
-import { Star, MapPin } from 'lucide-react';
+import ImageViewer from '@/components/player/ImageViewer';
+import { Star } from 'lucide-react';
 import Link from 'next/link';
 
 interface Bounds {
@@ -110,14 +110,8 @@ export default function MapContainer() {
     );
   }
 
-  // 4. Check Geolocation Error
-  if (geoError) {
-    return (
-      <div className="w-full h-[100dvh] flex items-center justify-center bg-gray-100">
-        <p className="text-red-500">위치 정보를 가져올 수 없습니다: {geoError}</p>
-      </div>
-    );
-  }
+  // 4. Check Geolocation Error (위치 권한 거부는 치명적이지 않으므로 기본 위치로 진행)
+  // if (geoError) { ... } 대신 경고만 표시
 
   return (
     <div className="relative w-full h-[100dvh]">
@@ -157,13 +151,20 @@ export default function MapContainer() {
       </Map>
       
       {/* Top Bar Actions */}
-      <div className="absolute top-4 right-4 z-10">
+      <div className="absolute top-4 right-4 z-10 flex gap-2">
         <Link href="/favorites">
           <Button variant="secondary" size="icon" className="shadow-md">
             <Star className="w-5 h-5" />
           </Button>
         </Link>
       </div>
+
+      {/* Geolocation Warning */}
+      {geoError && (
+        <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-10 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg shadow-md text-xs max-w-xs text-center">
+          위치 권한이 거부되어 서울시청 위치로 표시됩니다.
+        </div>
+      )}
       
       {/* Loading Indicator */}
       {isCCTVLoading && (
@@ -172,7 +173,7 @@ export default function MapContainer() {
         </div>
       )}
 
-      {/* Video Player Sheet */}
+      {/* CCTV Image Sheet */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent side="bottom" className="h-[60dvh] sm:h-[500px] rounded-t-xl p-0">
           <div className="p-6 h-full flex flex-col">
@@ -180,7 +181,7 @@ export default function MapContainer() {
               <div className="space-y-1">
                 <SheetTitle>{selectedCCTV?.name || 'CCTV'}</SheetTitle>
                 <SheetDescription>
-                  실시간 교통 영상을 확인합니다.
+                  실시간 교통 상황 이미지입니다.
                 </SheetDescription>
               </div>
               <Button
@@ -198,13 +199,14 @@ export default function MapContainer() {
             </SheetHeader>
             
             <div className="flex-1 w-full bg-black rounded-lg overflow-hidden relative">
-              {selectedCCTV && isSheetOpen && (
-                 <VideoPlayer src={selectedCCTV.cctvUrl} />
+              {selectedCCTV && isSheetOpen && selectedCCTV.imageUrl && (
+                 <ImageViewer src={selectedCCTV.imageUrl} alt={selectedCCTV.name} />
               )}
             </div>
 
             <div className="mt-4 text-sm text-gray-500">
-              <p>출처: {selectedCCTV?.source === 'EX' ? '한국도로공사' : '국가교통정보센터(ITS)'}</p>
+              <p>출처: {selectedCCTV?.source === 'SEOUL' ? '서울시 CCTV' : '국가교통정보센터'}</p>
+              <p className="text-xs mt-1">※ 현재는 샘플 이미지가 표시됩니다.</p>
             </div>
           </div>
         </SheetContent>
