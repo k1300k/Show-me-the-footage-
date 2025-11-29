@@ -9,17 +9,19 @@ interface Bounds {
   maxY: number;
 }
 
-// API Response structure
 interface CCTVResponse {
   response: {
     data: Array<{
       cctvname: string;
+      cctvid: string;
       cctvurl: string;
+      imageUrl: string;
       coordx: number;
       coordy: number;
-      cctvtype?: number;
+      status?: string;
+      direction?: string;
     }>;
-  } | null;
+  };
 }
 
 export const fetchCCTVData = async (bounds: Bounds) => {
@@ -29,7 +31,6 @@ export const fetchCCTVData = async (bounds: Bounds) => {
       maxX: bounds.maxX,
       minY: bounds.minY,
       maxY: bounds.maxY,
-      type: 'all',
     },
   });
   return data;
@@ -40,20 +41,22 @@ export const useCCTVData = (bounds: Bounds | null) => {
     queryKey: ['cctv', bounds],
     queryFn: () => fetchCCTVData(bounds!),
     enabled: !!bounds,
-    staleTime: 1000 * 60, // 1 minute
+    staleTime: 1000 * 30, // 30초마다 갱신
     select: (data): CCTV[] => {
       if (!data?.response?.data || !Array.isArray(data.response.data)) return [];
       
       return data.response.data.map((item) => ({
-        id: item.cctvurl, // Use URL as ID
+        id: item.cctvid,
         name: item.cctvname,
         coord: {
           lat: item.coordy,
           lng: item.coordx,
         },
         cctvUrl: item.cctvurl,
-        imageUrl: item.cctvurl, // 이미지 URL로 사용
-        source: 'SEOUL',
+        imageUrl: item.imageUrl,
+        direction: item.direction,
+        source: 'KTICT',
+        status: item.status === 'NORMAL' ? 'NORMAL' : 'ERROR',
       }));
     },
   });

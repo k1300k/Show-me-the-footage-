@@ -7,6 +7,7 @@ import { useCCTVData } from '@/hooks/useCCTVData';
 import { useFavorites } from '@/hooks/useFavorites';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { CCTV } from '@/types';
 import {
   Sheet,
@@ -16,7 +17,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import ImageViewer from '@/components/player/ImageViewer';
-import { Star } from 'lucide-react';
+import { Star, Video } from 'lucide-react';
 import Link from 'next/link';
 
 interface Bounds {
@@ -27,7 +28,6 @@ interface Bounds {
 }
 
 export default function MapContainer() {
-  // Load Kakao Maps SDK
   const [ isKakaoLoading, kakaoError ] = useKakaoLoader({
     appkey: process.env.NEXT_PUBLIC_KAKAO_MAP_KEY as string,
     libraries: ['services', 'clusterer'],
@@ -37,11 +37,11 @@ export default function MapContainer() {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selectedCCTV, setSelectedCCTV] = useState<CCTV | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
   
   const { data: cctvList, isLoading: isCCTVLoading } = useCCTVData(bounds);
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
-  // Default center (Seoul City Hall)
   const defaultCenter = { lat: 37.5665, lng: 126.9780 };
   const center = location || defaultCenter;
 
@@ -66,6 +66,7 @@ export default function MapContainer() {
   const handleMarkerClick = (cctv: CCTV) => {
     setSelectedCCTV(cctv);
     setIsSheetOpen(true);
+    setShowVideo(false);
   };
 
   const toggleFavorite = () => {
@@ -77,18 +78,16 @@ export default function MapContainer() {
     }
   };
 
-  // 1. Check Kakao SDK Error
   if (kakaoError) {
     return (
       <div className="w-full h-[100dvh] flex items-center justify-center bg-gray-100 flex-col p-4 text-center">
         <p className="text-red-500 font-bold mb-2">지도 로드 실패</p>
         <p className="text-sm text-gray-600 mb-4">{kakaoError.message}</p>
-        <p className="text-xs text-gray-500">.env.local 파일에 NEXT_PUBLIC_KAKAO_MAP_KEY가 올바르게 설정되었는지 확인해주세요.</p>
+        <p className="text-xs text-gray-500">.env.local 파일에 NEXT_PUBLIC_KAKAO_MAP_KEY를 설정해주세요.</p>
       </div>
     );
   }
 
-  // 2. Check Kakao SDK Loading
   if (isKakaoLoading) {
     return (
       <div className="w-full h-[100dvh] flex items-center justify-center bg-gray-100">
@@ -100,7 +99,6 @@ export default function MapContainer() {
     );
   }
 
-  // 3. Check Geolocation Loading
   if (isGeoLoading) {
     return (
       <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-gray-100 space-y-4">
@@ -109,9 +107,6 @@ export default function MapContainer() {
       </div>
     );
   }
-
-  // 4. Check Geolocation Error (위치 권한 거부는 치명적이지 않으므로 기본 위치로 진행)
-  // if (geoError) { ... } 대신 경고만 표시
 
   return (
     <div className="relative w-full h-[100dvh]">
@@ -133,12 +128,10 @@ export default function MapContainer() {
               title={cctv.name}
               clickable={true}
               onClick={() => handleMarkerClick(cctv)}
-            >
-            </MapMarker>
+            />
           ))}
         </MarkerClusterer>
 
-        {/* Current User Marker */}
         {location && (
           <MapMarker 
             position={location}
@@ -150,7 +143,6 @@ export default function MapContainer() {
         )}
       </Map>
       
-      {/* Top Bar Actions */}
       <div className="absolute top-4 right-4 z-10 flex gap-2">
         <Link href="/favorites">
           <Button variant="secondary" size="icon" className="shadow-md">
@@ -159,54 +151,83 @@ export default function MapContainer() {
         </Link>
       </div>
 
-      {/* Geolocation Warning */}
       {geoError && (
         <div className="absolute bottom-20 left-1/2 transform -translate-x-1/2 z-10 bg-yellow-100 text-yellow-800 px-4 py-2 rounded-lg shadow-md text-xs max-w-xs text-center">
           위치 권한이 거부되어 서울시청 위치로 표시됩니다.
         </div>
       )}
       
-      {/* Loading Indicator */}
       {isCCTVLoading && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-white/80 px-4 py-2 rounded-full shadow-md text-sm animate-pulse">
           CCTV 정보를 불러오는 중...
         </div>
       )}
 
-      {/* CCTV Image Sheet */}
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-        <SheetContent side="bottom" className="h-[60dvh] sm:h-[500px] rounded-t-xl p-0">
+        <SheetContent side="bottom" className="h-[70dvh] sm:h-[600px] rounded-t-xl p-0">
           <div className="p-6 h-full flex flex-col">
             <SheetHeader className="mb-4 flex flex-row items-center justify-between space-y-0">
               <div className="space-y-1">
-                <SheetTitle>{selectedCCTV?.name || 'CCTV'}</SheetTitle>
+                <div className="flex items-center gap-2">
+                  <SheetTitle>{selectedCCTV?.name || 'CCTV'}</SheetTitle>
+                  {selectedCCTV?.status === 'NORMAL' && (
+                    <Badge variant="default" className="bg-green-500">정상</Badge>
+                  )}
+                </div>
                 <SheetDescription>
-                  실시간 교통 상황 이미지입니다.
+                  {showVideo ? 'LIVE 스트리밍' : '실시간 교통 상황 이미지 (5초마다 갱신)'}
                 </SheetDescription>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={toggleFavorite}
-                className="text-yellow-500 hover:text-yellow-600"
-              >
-                {selectedCCTV && isFavorite(selectedCCTV.id) ? (
-                  <Star className="w-6 h-6 fill-current" />
-                ) : (
-                  <Star className="w-6 h-6" />
-                )}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setShowVideo(!showVideo)}
+                  className="text-blue-500 hover:text-blue-600"
+                  title={showVideo ? '이미지 보기' : '영상 보기'}
+                >
+                  <Video className="w-6 h-6" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={toggleFavorite}
+                  className="text-yellow-500 hover:text-yellow-600"
+                >
+                  {selectedCCTV && isFavorite(selectedCCTV.id) ? (
+                    <Star className="w-6 h-6 fill-current" />
+                  ) : (
+                    <Star className="w-6 h-6" />
+                  )}
+                </Button>
+              </div>
             </SheetHeader>
             
             <div className="flex-1 w-full bg-black rounded-lg overflow-hidden relative">
-              {selectedCCTV && isSheetOpen && selectedCCTV.imageUrl && (
-                 <ImageViewer src={selectedCCTV.imageUrl} alt={selectedCCTV.name} />
+              {selectedCCTV && isSheetOpen && !showVideo && (
+                <ImageViewer 
+                  src={selectedCCTV.imageUrl} 
+                  alt={selectedCCTV.name}
+                  autoRefresh={true}
+                  refreshInterval={5000}
+                />
+              )}
+              {selectedCCTV && isSheetOpen && showVideo && (
+                <video 
+                  controls 
+                  autoPlay 
+                  playsInline
+                  className="w-full h-full"
+                  src={selectedCCTV.cctvUrl}
+                >
+                  브라우저가 비디오 재생을 지원하지 않습니다.
+                </video>
               )}
             </div>
 
             <div className="mt-4 text-sm text-gray-500">
-              <p>출처: {selectedCCTV?.source === 'SEOUL' ? '서울시 CCTV' : '국가교통정보센터'}</p>
-              <p className="text-xs mt-1">※ 현재는 샘플 이미지가 표시됩니다.</p>
+              <p>출처: KT ICT CCTV</p>
+              <p className="text-xs mt-1">ID: {selectedCCTV?.id} {selectedCCTV?.direction && `| ${selectedCCTV.direction}`}</p>
             </div>
           </div>
         </SheetContent>

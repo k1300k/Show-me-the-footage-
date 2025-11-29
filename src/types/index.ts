@@ -1,12 +1,13 @@
 export interface CCTV {
-  id: string;
+  id: string; // CCTV ID (KT ICT DB의 cctv_id)
   name: string;
   coord: {
     lat: number;
     lng: number;
   };
-  cctvUrl: string;
-  imageUrl?: string; // 썸네일 이미지 URL 추가
+  cctvUrl: string; // HLS Stream URL
+  imageUrl: string; // JPEG Thumbnail URL
   direction?: string;
-  source: 'SEOUL' | 'ITS' | 'EX';
+  source: 'KTICT';
+  status?: 'NORMAL' | 'ERROR'; // 실시간 상태
 }
