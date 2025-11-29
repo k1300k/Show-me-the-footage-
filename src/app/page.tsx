@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import ImageViewer from '@/components/player/ImageViewer';
 import { CCTV } from '@/types';
-import { Star, Send, MessageSquare, Video, Search } from 'lucide-react';
+import { Star, Send, MessageSquare, Video, Search, Hash } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
 
 interface Message {
@@ -20,9 +20,24 @@ interface Message {
   sender: 'user' | 'system';
 }
 
+// 인기 CCTV 해시태그 목록
+const POPULAR_CCTV_TAGS = [
+  '강남역',
+  '신촌역',
+  '광화문',
+  '서울역',
+  '올림픽대로',
+  '한강대교',
+  '마포대교',
+  '여의도',
+  '잠실',
+  '홍대',
+  '이태원',
+  '명동',
+];
+
 // 간단한 키워드 추출 함수 (자연어 처리)
 const extractKeyword = (text: string): string => {
-  // 1. 불필요한 조사/어미 제거 (보여줘, 어때, 알려줘, 상황 등)
   const patterns = [
     /보여줘$/, /알려줘$/, /어때$/, /상황$/, /교통$/, /cctv$/, /씨씨티비$/,
     /는 어때$/, /좀 보여줘$/, /영상$/, /확인$/, /검색$/
@@ -33,7 +48,6 @@ const extractKeyword = (text: string): string => {
     keyword = keyword.replace(pattern, '').trim();
   });
 
-  // 2. 조사 제거 (은/는/이/가/을/를/에/에서)
   const josa = /[은는이가을를에에서]$/;
   if (josa.test(keyword) && keyword.length > 1) {
     keyword = keyword.replace(josa, '').trim();
@@ -47,7 +61,7 @@ export default function HomePage() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [showCCTVList, setShowCCTVList] = useState(false);
-  const [filteredCCTVs, setFilteredCCTVs] = useState<CCTV[]>([]); // 필터링된 CCTV 목록
+  const [filteredCCTVs, setFilteredCCTVs] = useState<CCTV[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -64,14 +78,12 @@ export default function HomePage() {
   ]);
   const [inputMessage, setInputMessage] = useState('');
 
-  // 전체 CCTV 데이터 로드
   const { data: allCCTVList, isLoading } = useCCTVData({
-    minX: 126.0, maxX: 128.0, minY: 36.0, maxY: 38.0 // 서울/경기권 범위
+    minX: 126.0, maxX: 128.0, minY: 36.0, maxY: 38.0
   });
   
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
-  // 초기 로딩 시 전체 목록 설정 (하지만 화면엔 안 보임)
   useEffect(() => {
     if (allCCTVList) {
       setFilteredCCTVs(allCCTVList);
@@ -101,37 +113,26 @@ export default function HomePage() {
     }
   };
 
-  const sendMessage = () => {
-    if (!inputMessage.trim()) return;
+  // 해시태그 클릭 핸들러
+  const handleHashtagClick = (tag: string) => {
+    setInputMessage(tag);
+    performSearch(tag);
+  };
+
+  // 검색 수행 함수 (공통 로직)
+  const performSearch = (keyword: string) => {
+    if (!keyword.trim()) return;
 
     const userMsg: Message = {
       id: Date.now().toString(),
-      text: inputMessage,
+      text: keyword,
       timestamp: new Date(),
       sender: 'user',
     };
 
     setMessages(prev => [...prev, userMsg]);
-    const userInput = inputMessage;
     setInputMessage('');
 
-    // 1. 키워드 추출 (NLP)
-    const keyword = extractKeyword(userInput);
-    console.log(`Extracted Keyword: ${keyword}`);
-
-    if (!keyword) {
-      setTimeout(() => {
-        setMessages(prev => [...prev, {
-          id: Date.now().toString(),
-          text: '검색할 장소명을 정확히 입력해주세요.',
-          timestamp: new Date(),
-          sender: 'system',
-        }]);
-      }, 500);
-      return;
-    }
-
-    // 2. CCTV 검색 및 필터링
     if (allCCTVList) {
       const results = allCCTVList.filter(cctv => 
         cctv.name.includes(keyword) || cctv.direction?.includes(keyword)
@@ -140,7 +141,6 @@ export default function HomePage() {
       setFilteredCCTVs(results);
       setShowCCTVList(true);
 
-      // 3. 응답 메시지 생성
       setTimeout(() => {
         let responseText = '';
         if (results.length > 0) {
@@ -157,6 +157,27 @@ export default function HomePage() {
         }]);
       }, 500);
     }
+  };
+
+  const sendMessage = () => {
+    if (!inputMessage.trim()) return;
+
+    const keyword = extractKeyword(inputMessage);
+    console.log(`Extracted Keyword: ${keyword}`);
+
+    if (!keyword) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          text: '검색할 장소명을 정확히 입력해주세요.',
+          timestamp: new Date(),
+          sender: 'system',
+        }]);
+      }, 500);
+      return;
+    }
+
+    performSearch(keyword);
   };
 
   const handleSearchClick = () => {
@@ -225,7 +246,7 @@ export default function HomePage() {
               </div>
 
               {/* Input */}
-              <div className="flex gap-2 flex-shrink-0">
+              <div className="flex gap-2 flex-shrink-0 mb-2">
                 <Input
                   placeholder="예: 강남역 보여줘, 성수대교 상황 어때?"
                   value={inputMessage}
@@ -235,6 +256,25 @@ export default function HomePage() {
                 <Button size="icon" onClick={sendMessage}>
                   <Send className="w-4 h-4" />
                 </Button>
+              </div>
+
+              {/* 해시태그 영역 */}
+              <div className="flex-shrink-0">
+                <div className="flex items-center gap-2 mb-2">
+                  <Hash className="w-3 h-3 text-gray-400" />
+                  <span className="text-xs text-gray-500">인기 검색어</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {POPULAR_CCTV_TAGS.map((tag) => (
+                    <button
+                      key={tag}
+                      onClick={() => handleHashtagClick(tag)}
+                      className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors border border-blue-200"
+                    >
+                      #{tag}
+                    </button>
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
