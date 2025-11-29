@@ -4,7 +4,9 @@ import { useState, useCallback } from 'react';
 import { Map, MapMarker, MarkerClusterer } from 'react-kakao-maps-sdk';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useCCTVData } from '@/hooks/useCCTVData';
+import { useFavorites } from '@/hooks/useFavorites';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { CCTV } from '@/types';
 import {
   Sheet,
@@ -14,6 +16,8 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import VideoPlayer from '@/components/player/VideoPlayer';
+import { Star, MapPin } from 'lucide-react';
+import Link from 'next/link';
 
 interface Bounds {
   minX: number;
@@ -29,6 +33,7 @@ export default function MapContainer() {
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   
   const { data: cctvList, isLoading: isCCTVLoading } = useCCTVData(bounds);
+  const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
   // Default center (Seoul City Hall)
   const defaultCenter = { lat: 37.5665, lng: 126.9780 };
@@ -55,6 +60,15 @@ export default function MapContainer() {
   const handleMarkerClick = (cctv: CCTV) => {
     setSelectedCCTV(cctv);
     setIsSheetOpen(true);
+  };
+
+  const toggleFavorite = () => {
+    if (!selectedCCTV) return;
+    if (isFavorite(selectedCCTV.id)) {
+      removeFavorite(selectedCCTV.id);
+    } else {
+      addFavorite(selectedCCTV);
+    }
   };
 
   if (isGeoLoading) {
@@ -95,8 +109,6 @@ export default function MapContainer() {
               clickable={true}
               onClick={() => handleMarkerClick(cctv)}
             >
-              {/* Marker InfoWindow (Optional, minimal) */}
-              {/* <div style={{ padding: "5px", color: "#000" }}>{cctv.name}</div> */}
             </MapMarker>
           ))}
         </MarkerClusterer>
@@ -113,6 +125,15 @@ export default function MapContainer() {
         )}
       </Map>
       
+      {/* Top Bar Actions */}
+      <div className="absolute top-4 right-4 z-10">
+        <Link href="/favorites">
+          <Button variant="secondary" size="icon" className="shadow-md">
+            <Star className="w-5 h-5" />
+          </Button>
+        </Link>
+      </div>
+      
       {/* Loading Indicator */}
       {isCCTVLoading && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-white/80 px-4 py-2 rounded-full shadow-md text-sm animate-pulse">
@@ -124,11 +145,25 @@ export default function MapContainer() {
       <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
         <SheetContent side="bottom" className="h-[60dvh] sm:h-[500px] rounded-t-xl p-0">
           <div className="p-6 h-full flex flex-col">
-            <SheetHeader className="mb-4">
-              <SheetTitle>{selectedCCTV?.name || 'CCTV'}</SheetTitle>
-              <SheetDescription>
-                실시간 교통 영상을 확인합니다.
-              </SheetDescription>
+            <SheetHeader className="mb-4 flex flex-row items-center justify-between space-y-0">
+              <div className="space-y-1">
+                <SheetTitle>{selectedCCTV?.name || 'CCTV'}</SheetTitle>
+                <SheetDescription>
+                  실시간 교통 영상을 확인합니다.
+                </SheetDescription>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={toggleFavorite}
+                className="text-yellow-500 hover:text-yellow-600"
+              >
+                {selectedCCTV && isFavorite(selectedCCTV.id) ? (
+                  <Star className="w-6 h-6 fill-current" />
+                ) : (
+                  <Star className="w-6 h-6" />
+                )}
+              </Button>
             </SheetHeader>
             
             <div className="flex-1 w-full bg-black rounded-lg overflow-hidden relative">
