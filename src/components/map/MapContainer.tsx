@@ -1,10 +1,19 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Map, MapMarker, MarkerClusterer, useKakaoLoader } from 'react-kakao-maps-sdk';
+import { Map, MapMarker, MarkerClusterer } from 'react-kakao-maps-sdk';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useCCTVData } from '@/hooks/useCCTVData';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CCTV } from '@/types';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+import VideoPlayer from '@/components/player/VideoPlayer';
 
 interface Bounds {
   minX: number;
@@ -16,6 +25,8 @@ interface Bounds {
 export default function MapContainer() {
   const { location, isLoading: isGeoLoading, error: geoError } = useGeolocation();
   const [bounds, setBounds] = useState<Bounds | null>(null);
+  const [selectedCCTV, setSelectedCCTV] = useState<CCTV | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   
   const { data: cctvList, isLoading: isCCTVLoading } = useCCTVData(bounds);
 
@@ -39,6 +50,11 @@ export default function MapContainer() {
       minY: b.getSouthWest().getLat(),
       maxY: b.getNorthEast().getLat(),
     });
+  };
+
+  const handleMarkerClick = (cctv: CCTV) => {
+    setSelectedCCTV(cctv);
+    setIsSheetOpen(true);
   };
 
   if (isGeoLoading) {
@@ -77,14 +93,10 @@ export default function MapContainer() {
               position={{ lat: cctv.coord.lat, lng: cctv.coord.lng }}
               title={cctv.name}
               clickable={true}
-              onClick={(marker) => {
-                // TODO: Open Video Player
-                console.log('Clicked CCTV:', cctv);
-              }}
+              onClick={() => handleMarkerClick(cctv)}
             >
-              <div style={{ padding: "5px", color: "#000" }}>
-                {cctv.name}
-              </div>
+              {/* Marker InfoWindow (Optional, minimal) */}
+              {/* <div style={{ padding: "5px", color: "#000" }}>{cctv.name}</div> */}
             </MapMarker>
           ))}
         </MarkerClusterer>
@@ -101,12 +113,36 @@ export default function MapContainer() {
         )}
       </Map>
       
-      {/* Loading Indicator for CCTV Data */}
+      {/* Loading Indicator */}
       {isCCTVLoading && (
-        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-white/80 px-4 py-2 rounded-full shadow-md text-sm">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 bg-white/80 px-4 py-2 rounded-full shadow-md text-sm animate-pulse">
           CCTV 정보를 불러오는 중...
         </div>
       )}
+
+      {/* Video Player Sheet */}
+      <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+        <SheetContent side="bottom" className="h-[60dvh] sm:h-[500px] rounded-t-xl p-0">
+          <div className="p-6 h-full flex flex-col">
+            <SheetHeader className="mb-4">
+              <SheetTitle>{selectedCCTV?.name || 'CCTV'}</SheetTitle>
+              <SheetDescription>
+                실시간 교통 영상을 확인합니다.
+              </SheetDescription>
+            </SheetHeader>
+            
+            <div className="flex-1 w-full bg-black rounded-lg overflow-hidden relative">
+              {selectedCCTV && isSheetOpen && (
+                 <VideoPlayer src={selectedCCTV.cctvUrl} />
+              )}
+            </div>
+
+            <div className="mt-4 text-sm text-gray-500">
+              <p>출처: {selectedCCTV?.source === 'EX' ? '한국도로공사' : '국가교통정보센터(ITS)'}</p>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
