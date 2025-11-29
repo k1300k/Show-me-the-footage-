@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import ImageViewer from '@/components/player/ImageViewer';
 import { CCTV } from '@/types';
-import { Star, Send, MessageSquare, Video } from 'lucide-react';
+import { Star, Send, MessageSquare, Video, Search } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
 
 interface Message {
@@ -24,10 +24,17 @@ export default function HomePage() {
   const [selectedCCTV, setSelectedCCTV] = useState<CCTV | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [showCCTVList, setShowCCTVList] = useState(false); // CCTV 목록 표시 여부
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
       text: '안녕하세요! 전국 CCTV 실시간 영상 서비스입니다.',
+      timestamp: new Date(),
+      sender: 'system',
+    },
+    {
+      id: '2',
+      text: '원하시는 지역이나 도로명을 말씀해주세요.',
       timestamp: new Date(),
       sender: 'system',
     },
@@ -42,7 +49,7 @@ export default function HomePage() {
     maxY: 37.7,
   });
 
-  const { data: cctvList, isLoading } = useCCTVData(bounds);
+  const { data: cctvList, isLoading } = useCCTVData(showCCTVList ? bounds : null);
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
   const handleCCTVClick = (cctv: CCTV) => {
@@ -80,18 +87,35 @@ export default function HomePage() {
     };
 
     setMessages(prev => [...prev, userMsg]);
+    const userInput = inputMessage;
     setInputMessage('');
+
+    // CCTV 목록 표시
+    if (!showCCTVList) {
+      setShowCCTVList(true);
+    }
 
     // 간단한 자동 응답
     setTimeout(() => {
       const systemMsg: Message = {
         id: (Date.now() + 1).toString(),
-        text: '메시지를 확인했습니다. CCTV 영상을 선택해주세요.',
+        text: `"${userInput}"에 대한 CCTV를 검색하고 있습니다. 아래 목록을 확인해주세요.`,
         timestamp: new Date(),
         sender: 'system',
       };
       setMessages(prev => [...prev, systemMsg]);
     }, 500);
+  };
+
+  const handleSearchClick = () => {
+    setShowCCTVList(true);
+    const systemMsg: Message = {
+      id: Date.now().toString(),
+      text: '전체 CCTV 목록을 불러오고 있습니다.',
+      timestamp: new Date(),
+      sender: 'system',
+    };
+    setMessages(prev => [...prev, systemMsg]);
   };
 
   return (
@@ -151,7 +175,7 @@ export default function HomePage() {
               {/* Input */}
               <div className="flex gap-2 flex-shrink-0">
                 <Input
-                  placeholder="메시지를 입력하세요..."
+                  placeholder="지역명이나 도로명을 입력하세요... (예: 강남역)"
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
@@ -163,60 +187,81 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          {/* Bottom: CCTV List */}
-          <Card className="flex-1 flex flex-col min-h-0">
-            <CardHeader className="flex-shrink-0 pb-3">
-              <CardTitle className="text-lg">CCTV 목록 ({cctvList?.length || 0}개)</CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-4 pt-0">
-              {isLoading ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {[1, 2, 3, 4].map((i) => (
-                    <Card key={i}>
-                      <CardContent className="p-3 space-y-2">
-                        <Skeleton className="h-32 w-full" />
-                        <Skeleton className="h-3 w-3/4" />
-                      </CardContent>
-                    </Card>
-                  ))}
+          {/* Bottom: CCTV List (조건부 렌더링) */}
+          {showCCTVList ? (
+            <Card className="flex-1 flex flex-col min-h-0">
+              <CardHeader className="flex-shrink-0 pb-3">
+                <CardTitle className="text-lg">CCTV 목록 ({cctvList?.length || 0}개)</CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 overflow-y-auto p-4 pt-0">
+                {isLoading ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {[1, 2, 3, 4].map((i) => (
+                      <Card key={i}>
+                        <CardContent className="p-3 space-y-2">
+                          <Skeleton className="h-32 w-full" />
+                          <Skeleton className="h-3 w-3/4" />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : cctvList && cctvList.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {cctvList.map((cctv) => (
+                      <Card
+                        key={cctv.id}
+                        className="cursor-pointer hover:shadow-lg transition-shadow"
+                        onClick={() => handleCCTVClick(cctv)}
+                      >
+                        <CardContent className="p-0">
+                          <div className="relative aspect-video bg-gray-900">
+                            <ImageViewer
+                              src={cctv.imageUrl}
+                              alt={cctv.name}
+                              autoRefresh={false}
+                            />
+                            {cctv.status === 'NORMAL' && (
+                              <Badge className="absolute top-1 right-1 text-xs bg-green-500">
+                                정상
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="p-2">
+                            <h3 className="font-semibold text-xs truncate">{cctv.name}</h3>
+                            <p className="text-xs text-gray-500">ID: {cctv.id}</p>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 text-gray-500">
+                    <p>CCTV 데이터를 불러오는 중입니다...</p>
+                    <p className="text-sm mt-2">잠시만 기다려주세요.</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            // 초기 화면: CCTV 검색 안내
+            <Card className="flex-1 flex items-center justify-center">
+              <CardContent className="text-center space-y-4 py-20">
+                <Search className="w-16 h-16 mx-auto text-gray-400" />
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
+                    CCTV를 검색해보세요
+                  </h3>
+                  <p className="text-gray-500 mb-4">
+                    위 메시지창에 지역명이나 도로명을 입력하세요
+                  </p>
+                  <Button onClick={handleSearchClick} size="lg">
+                    <Search className="w-4 h-4 mr-2" />
+                    전체 CCTV 보기
+                  </Button>
                 </div>
-              ) : cctvList && cctvList.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                  {cctvList.map((cctv) => (
-                    <Card
-                      key={cctv.id}
-                      className="cursor-pointer hover:shadow-lg transition-shadow"
-                      onClick={() => handleCCTVClick(cctv)}
-                    >
-                      <CardContent className="p-0">
-                        <div className="relative aspect-video bg-gray-900">
-                          <ImageViewer
-                            src={cctv.imageUrl}
-                            alt={cctv.name}
-                            autoRefresh={false}
-                          />
-                          {cctv.status === 'NORMAL' && (
-                            <Badge className="absolute top-1 right-1 text-xs bg-green-500">
-                              정상
-                            </Badge>
-                          )}
-                        </div>
-                        <div className="p-2">
-                          <h3 className="font-semibold text-xs truncate">{cctv.name}</h3>
-                          <p className="text-xs text-gray-500">ID: {cctv.id}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-20 text-gray-500">
-                  <p>CCTV 데이터를 불러오는 중입니다...</p>
-                  <p className="text-sm mt-2">잠시만 기다려주세요.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
 
