@@ -1,0 +1,134 @@
+---
+alwaysApply: true
+
+
+
+cctv
+
+https://chatgpt.com/share/692a65ab-6874-8001-bb34-863a1e5a0d3d
+
+15년차 서비스 기획자로서, 공유해주신 링크의 의도를 파악하고 이를 **실제 개발 가능한 수준의 고도화된 PRD(Product Requirements Document)**로 재구성했습니다.
+Cursor AI가 이 문서를 읽고 바로 코드를 짤 수 있도록, 기술 스택 정의, 디렉토리 구조, 데이터 흐름, 핵심 기능 명세를 명확히 구조화한 prd.mdc 파일을 제안합니다.
+이 내용은 단순한 CCTV 뷰어를 넘어, **"사용자 위치 기반 초고속 교통 상황 확인 서비스"**를 지향합니다.
+📂 파일명: prd.mdc
+(프로젝트 루트 경로 혹은 .cursor/rules/ 폴더 내에 저장하세요)
+---
+description: Show Me The CCTV (전국 도로 CCTV 실시간 확인 서비스) 구축을 위한 PRD 및 개발 가이드라인
+globs: **/*.{ts,tsx,js,jsx,md,json}
+---
+
+# Project: Show Me The CCTV (SMTC)
+
+## 1. 프로젝트 개요 (Overview)
+- **목표**: 사용자의 현재 위치 또는 지정한 위치 기반으로 반경 Nkm 내의 도로 CCTV 영상을 실시간으로 제공하여 교통 상황을 직관적으로 확인하는 모바일 웹/앱 서비스.
+- **핵심 가치**: "Show Me The Money"처럼, 복잡한 조작 없이 **"보여줘"** 한 번으로 즉시 상황 파악.
+- **타겟 유저**: 출퇴근 운전자, 명절 귀성객, 날씨 상황을 눈으로 확인하고 싶은 유저.
+
+## 2. 기술 스택 (Tech Stack)
+Cursor AI는 아래 스택을 엄격히 준수하여 코드를 생성한다.
+
+- **Framework**: Next.js 14+ (App Router)
+- **Language**: TypeScript (Strict Mode)
+- **Styling**: Tailwind CSS + Shadcn/UI (Radix UI 기반)
+- **State Management**: Zustand (가벼운 전역 상태 관리)
+- **Maps**:
+- `react-kakao-maps-sdk` (한국 최적화) 또는 `react-leaflet` (오픈소스 대안)
+- *기획자 코멘트: 초기 MVP는 Kakao Maps API를 우선으로 함.*
+- **Video Player**: `hls.js` (국가교통정보센터 CCTV가 대부분 .m3u8 스트리밍을 사용함)
+- **Data Fetching**: TanStack Query (React Query)
+- **Icon**: Lucide React
+
+## 3. 핵심 기능 명세 (Functional Requirements)
+
+### 3.1. 메인 지도 뷰 (Main Map View)
+- **초기 진입**: 사용자 Geolocation 권한 요청 -> 허용 시 현재 위치로 지도 중심 이동.
+- **CCTV 마커 표시**:
+- 지도 화면 내(Viewport)에 존재하는 CCTV만 필터링하여 마커 렌더링.
+- 마커 클러스터링(Clustering) 적용하여 성능 최적화 (줌 레벨에 따른 분기).
+- **검색**: 도로명, 지역명 검색을 통해 지도 중심 이동.
+
+### 3.2. CCTV 플레이어 (Streaming Interface)
+- **모달/바텀시트**: 마커 클릭 시 하단 바텀시트(Mobile) 또는 모달(Desktop)로 영상 재생.
+- **정보 표시**: CCTV 이름, 도로명, 방향 정보 표시.
+- **플레이어 기능**:
+- HLS 스트리밍 재생.
+- 로딩 상태(Skeleton UI) 및 에러 처리 (영상 송출 중단 시 '점검 중' 화면 표시).
+- 전체 화면 모드 지원.
+
+### 3.3. 즐겨찾기 (Favorites - Local Storage)
+- 자주 보는 CCTV를 '관심' 등록.
+- 로그인 없이 로컬 스토리지 기반으로 MVP 구현.
+- 메인 화면에 '내 관심 목록' 퀵 버튼 제공.
+
+## 4. 데이터 아키텍처 (Data Architecture)
+
+### 4.1. 외부 API 연동 (국가교통정보센터 ITS)
+- **API Endpoint**: ITS 표준 연계 API (OpenAPI) 활용.
+- **CCTV 메타데이터**: 위도(lat), 경도(lng), CCTV 이름, URL, 방향.
+- **영상 URL**: `.m3u8` 포맷의 HLS 스트림 URL.
+- **CORS 처리**: Next.js API Routes(Proxy)를 통해 클라이언트 측 CORS 에러 방지 필수.
+
+### 4.2. 데이터 모델 (TypeScript Interface)
+```typescript
+interface CCTV {
+id: string; // 고유 ID
+name: string; // 설치 장소명
+coord: {
+lat: number;
+lng: number;
+};
+cctvUrl: string; // 스트리밍 URL
+direction?: string; // 방향 (상행/하행)
+source: 'ITS' | 'EX'; // 국토부 표준 | 도로공사
+}
+
+5. UI/UX 가이드라인 (Design System)
+* 테마: 시스템 설정에 따르되, Dark Mode를 기본 권장 (영상 시인성 확보).
+* 레이아웃: 모바일 퍼스트(Mobile First). 하단 네비게이션 바(GNB) 구조.
+* 피드백:
+* 영상 로딩 중 -> 스피너/스켈레톤 표시.
+* 데이터 없음 -> "주변에 이용 가능한 CCTV가 없습니다" 토스트 메시지.
+6. 개발 규칙 및 프롬프트 가이드 (Cursor Rules)
+* 컴포넌트 구조: src/components 하위에 기능별 폴더링 (e.g., src/components/map, src/components/player).
+* 클라이언트/서버 컴포넌트 분리: 지도 및 영상 재생은 use client 필수이므로, 필요한 부분만 클라이언트 컴포넌트로 분리하여 최적화한다.
+* 에러 핸들링: CCTV 영상은 외부 요인으로 자주 끊길 수 있음. ErrorBoundary를 사용하여 앱 전체가 멈추지 않도록 구현한다.
+* 보안: API Key (Kakao Map, ITS API)는 반드시 .env.local로 관리하며 클라이언트에 직접 노출되지 않도록 주의한다.
+7. 폴더 구조 (Folder Structure) 제안
+src/
+├── app/
+│ ├── api/ # Proxy API for CORS
+│ ├── layout.tsx
+│ ├── page.tsx # Main Map View
+│ └── favorites/ # 즐겨찾기 페이지
+├── components/
+│ ├── map/
+│ │ ├── MapContainer.tsx
+│ │ ├── CCTVMarker.tsx
+│ │ └── Cluster.tsx
+│ ├── player/
+│ │ ├── VideoPlayer.tsx
+│ │ └── ControlBar.tsx
+│ └── ui/ # shadcn/ui components
+├── hooks/
+│ ├── useCCTVData.ts
+│ └── useGeolocation.ts
+├── lib/
+│ ├── api.ts # Axios setup
+│ └── utils.ts
+└── types/
+└── index.ts
+
+
+---
+
+### 💡 기획자 코멘트 (팁)
+이 파일을 Cursor 프로젝트에 포함시킨 후, 채팅창에 이렇게 입력하여 개발을 시작하세요:
+
+> "prd.mdc 파일을 참고해서, Next.js 프로젝트 초기 세팅을 진행해줘. shadcn/ui와 zustand, 그리고 카카오맵 SDK 설치까지 포함해서."
+
+이 방식이 당신이 원하던 "Show Me The CCTV"를 가장 빠르고 안정적으로 구현하는 지름길입니다.
+
+
+
+
+---
