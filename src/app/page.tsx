@@ -111,19 +111,19 @@ export default function HomePage() {
 
       {/* Main Content */}
       <div className="flex-1 overflow-hidden">
-        <div className="h-full max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-4 p-4">
+        <div className="h-full max-w-7xl mx-auto flex flex-col gap-4 p-4">
           
-          {/* Left: Message Box */}
-          <Card className="flex flex-col h-full md:col-span-1">
-            <CardHeader className="flex-shrink-0">
-              <CardTitle className="flex items-center gap-2">
+          {/* Top: Message Box */}
+          <Card className="flex flex-col h-64 md:h-80">
+            <CardHeader className="flex-shrink-0 pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <MessageSquare className="w-5 h-5" />
                 메시지
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col min-h-0 p-4">
+            <CardContent className="flex-1 flex flex-col min-h-0 p-4 pt-0">
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+              <div className="flex-1 overflow-y-auto space-y-3 mb-3">
                 {messages.map((msg) => (
                   <div
                     key={msg.id}
@@ -163,25 +163,25 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          {/* Right: CCTV List */}
-          <Card className="md:col-span-2 flex flex-col h-full">
-            <CardHeader className="flex-shrink-0">
-              <CardTitle>CCTV 목록 ({cctvList?.length || 0}개)</CardTitle>
+          {/* Bottom: CCTV List */}
+          <Card className="flex-1 flex flex-col min-h-0">
+            <CardHeader className="flex-shrink-0 pb-3">
+              <CardTitle className="text-lg">CCTV 목록 ({cctvList?.length || 0}개)</CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 overflow-y-auto p-4">
+            <CardContent className="flex-1 overflow-y-auto p-4 pt-0">
               {isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {[1, 2, 3, 4].map((i) => (
                     <Card key={i}>
-                      <CardContent className="p-4 space-y-3">
-                        <Skeleton className="h-40 w-full" />
-                        <Skeleton className="h-4 w-3/4" />
+                      <CardContent className="p-3 space-y-2">
+                        <Skeleton className="h-32 w-full" />
+                        <Skeleton className="h-3 w-3/4" />
                       </CardContent>
                     </Card>
                   ))}
                 </div>
               ) : cctvList && cctvList.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                   {cctvList.map((cctv) => (
                     <Card
                       key={cctv.id}
@@ -196,13 +196,13 @@ export default function HomePage() {
                             autoRefresh={false}
                           />
                           {cctv.status === 'NORMAL' && (
-                            <Badge className="absolute top-2 right-2 bg-green-500">
+                            <Badge className="absolute top-1 right-1 text-xs bg-green-500">
                               정상
                             </Badge>
                           )}
                         </div>
-                        <div className="p-3">
-                          <h3 className="font-semibold text-sm truncate">{cctv.name}</h3>
+                        <div className="p-2">
+                          <h3 className="font-semibold text-xs truncate">{cctv.name}</h3>
                           <p className="text-xs text-gray-500">ID: {cctv.id}</p>
                         </div>
                       </CardContent>
