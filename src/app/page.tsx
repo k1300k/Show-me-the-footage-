@@ -20,11 +20,34 @@ interface Message {
   sender: 'user' | 'system';
 }
 
+// 간단한 키워드 추출 함수 (자연어 처리)
+const extractKeyword = (text: string): string => {
+  // 1. 불필요한 조사/어미 제거 (보여줘, 어때, 알려줘, 상황 등)
+  const patterns = [
+    /보여줘$/, /알려줘$/, /어때$/, /상황$/, /교통$/, /cctv$/, /씨씨티비$/,
+    /는 어때$/, /좀 보여줘$/, /영상$/, /확인$/, /검색$/
+  ];
+  
+  let keyword = text.trim();
+  patterns.forEach(pattern => {
+    keyword = keyword.replace(pattern, '').trim();
+  });
+
+  // 2. 조사 제거 (은/는/이/가/을/를/에/에서)
+  const josa = /[은는이가을를에에서]$/;
+  if (josa.test(keyword) && keyword.length > 1) {
+    keyword = keyword.replace(josa, '').trim();
+  }
+
+  return keyword;
+};
+
 export default function HomePage() {
   const [selectedCCTV, setSelectedCCTV] = useState<CCTV | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
-  const [showCCTVList, setShowCCTVList] = useState(false); // CCTV 목록 표시 여부
+  const [showCCTVList, setShowCCTVList] = useState(false);
+  const [filteredCCTVs, setFilteredCCTVs] = useState<CCTV[]>([]); // 필터링된 CCTV 목록
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -34,33 +57,35 @@ export default function HomePage() {
     },
     {
       id: '2',
-      text: '원하시는 지역이나 도로명을 말씀해주세요.',
+      text: '원하시는 지역이나 도로명을 말씀해주세요. (예: "강남역 보여줘")',
       timestamp: new Date(),
       sender: 'system',
     },
   ]);
   const [inputMessage, setInputMessage] = useState('');
 
-  // 서울 전역을 커버하는 넓은 범위로 설정
-  const [bounds] = useState({
-    minX: 126.7,
-    maxX: 127.3,
-    minY: 37.4,
-    maxY: 37.7,
+  // 전체 CCTV 데이터 로드
+  const { data: allCCTVList, isLoading } = useCCTVData({
+    minX: 126.0, maxX: 128.0, minY: 36.0, maxY: 38.0 // 서울/경기권 범위
   });
-
-  const { data: cctvList, isLoading } = useCCTVData(showCCTVList ? bounds : null);
+  
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+
+  // 초기 로딩 시 전체 목록 설정 (하지만 화면엔 안 보임)
+  useEffect(() => {
+    if (allCCTVList) {
+      setFilteredCCTVs(allCCTVList);
+    }
+  }, [allCCTVList]);
 
   const handleCCTVClick = (cctv: CCTV) => {
     setSelectedCCTV(cctv);
     setIsSheetOpen(true);
     setShowVideo(false);
     
-    // 시스템 메시지 추가
     const systemMsg: Message = {
       id: Date.now().toString(),
-      text: `${cctv.name} CCTV 영상을 확인하고 있습니다.`,
+      text: `${cctv.name} CCTV 영상을 확인합니다.`,
       timestamp: new Date(),
       sender: 'system',
     };
@@ -90,32 +115,59 @@ export default function HomePage() {
     const userInput = inputMessage;
     setInputMessage('');
 
-    // CCTV 목록 표시
-    if (!showCCTVList) {
-      setShowCCTVList(true);
+    // 1. 키워드 추출 (NLP)
+    const keyword = extractKeyword(userInput);
+    console.log(`Extracted Keyword: ${keyword}`);
+
+    if (!keyword) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          text: '검색할 장소명을 정확히 입력해주세요.',
+          timestamp: new Date(),
+          sender: 'system',
+        }]);
+      }, 500);
+      return;
     }
 
-    // 간단한 자동 응답
-    setTimeout(() => {
-      const systemMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        text: `"${userInput}"에 대한 CCTV를 검색하고 있습니다. 아래 목록을 확인해주세요.`,
-        timestamp: new Date(),
-        sender: 'system',
-      };
-      setMessages(prev => [...prev, systemMsg]);
-    }, 500);
+    // 2. CCTV 검색 및 필터링
+    if (allCCTVList) {
+      const results = allCCTVList.filter(cctv => 
+        cctv.name.includes(keyword) || cctv.direction?.includes(keyword)
+      );
+
+      setFilteredCCTVs(results);
+      setShowCCTVList(true);
+
+      // 3. 응답 메시지 생성
+      setTimeout(() => {
+        let responseText = '';
+        if (results.length > 0) {
+          responseText = `"${keyword}" 관련 CCTV ${results.length}곳을 찾았습니다.`;
+        } else {
+          responseText = `"${keyword}"에 대한 CCTV 정보를 찾을 수 없습니다. 다른 지역을 검색해보세요.`;
+        }
+
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          text: responseText,
+          timestamp: new Date(),
+          sender: 'system',
+        }]);
+      }, 500);
+    }
   };
 
   const handleSearchClick = () => {
+    setFilteredCCTVs(allCCTVList || []);
     setShowCCTVList(true);
-    const systemMsg: Message = {
+    setMessages(prev => [...prev, {
       id: Date.now().toString(),
-      text: '전체 CCTV 목록을 불러오고 있습니다.',
+      text: '전체 CCTV 목록을 불러왔습니다.',
       timestamp: new Date(),
       sender: 'system',
-    };
-    setMessages(prev => [...prev, systemMsg]);
+    }]);
   };
 
   return (
@@ -175,7 +227,7 @@ export default function HomePage() {
               {/* Input */}
               <div className="flex gap-2 flex-shrink-0">
                 <Input
-                  placeholder="지역명이나 도로명을 입력하세요... (예: 강남역)"
+                  placeholder="예: 강남역 보여줘, 성수대교 상황 어때?"
                   value={inputMessage}
                   onChange={(e) => setInputMessage(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
@@ -187,11 +239,13 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          {/* Bottom: CCTV List (조건부 렌더링) */}
+          {/* Bottom: CCTV List */}
           {showCCTVList ? (
             <Card className="flex-1 flex flex-col min-h-0">
               <CardHeader className="flex-shrink-0 pb-3">
-                <CardTitle className="text-lg">CCTV 목록 ({cctvList?.length || 0}개)</CardTitle>
+                <CardTitle className="text-lg">
+                  검색 결과 ({filteredCCTVs.length}개)
+                </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 pt-0">
                 {isLoading ? (
@@ -205,9 +259,9 @@ export default function HomePage() {
                       </Card>
                     ))}
                   </div>
-                ) : cctvList && cctvList.length > 0 ? (
+                ) : filteredCCTVs.length > 0 ? (
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {cctvList.map((cctv) => (
+                    {filteredCCTVs.map((cctv) => (
                       <Card
                         key={cctv.id}
                         className="cursor-pointer hover:shadow-lg transition-shadow"
@@ -227,7 +281,9 @@ export default function HomePage() {
                             )}
                           </div>
                           <div className="p-2">
-                            <h3 className="font-semibold text-xs truncate">{cctv.name}</h3>
+                            <h3 className="font-semibold text-xs truncate" title={cctv.name}>
+                              {cctv.name}
+                            </h3>
                             <p className="text-xs text-gray-500">ID: {cctv.id}</p>
                           </div>
                         </CardContent>
@@ -236,27 +292,26 @@ export default function HomePage() {
                   </div>
                 ) : (
                   <div className="text-center py-20 text-gray-500">
-                    <p>CCTV 데이터를 불러오는 중입니다...</p>
-                    <p className="text-sm mt-2">잠시만 기다려주세요.</p>
+                    <p>검색 결과가 없습니다.</p>
+                    <p className="text-sm mt-2">다른 검색어로 시도해보세요.</p>
                   </div>
                 )}
               </CardContent>
             </Card>
           ) : (
-            // 초기 화면: CCTV 검색 안내
             <Card className="flex-1 flex items-center justify-center">
               <CardContent className="text-center space-y-4 py-20">
                 <Search className="w-16 h-16 mx-auto text-gray-400" />
                 <div>
                   <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                    CCTV를 검색해보세요
+                    어디를 보고 싶으신가요?
                   </h3>
                   <p className="text-gray-500 mb-4">
-                    위 메시지창에 지역명이나 도로명을 입력하세요
+                    "강남역 보여줘", "올림픽대로 상황" 처럼<br/>
+                    자연스럽게 물어보세요!
                   </p>
-                  <Button onClick={handleSearchClick} size="lg">
-                    <Search className="w-4 h-4 mr-2" />
-                    전체 CCTV 보기
+                  <Button onClick={handleSearchClick} variant="outline">
+                    전체 목록 보기
                   </Button>
                 </div>
               </CardContent>
