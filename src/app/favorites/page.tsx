@@ -15,9 +15,9 @@ export default function FavoritesPage() {
   // However, with Next.js SSR, we need to ensure we only render after mount.
   const [isMounted, setIsMounted] = useState(false);
   
-  useState(() => {
+  useEffect(() => {
     setIsMounted(true);
-  });
+  }, []);
 
   if (!isMounted) return null;
 
