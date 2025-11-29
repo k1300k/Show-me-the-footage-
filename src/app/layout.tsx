@@ -19,8 +19,6 @@ export const metadata: Metadata = {
   description: "Real-time CCTV viewer for traffic conditions",
 };
 
-const KAKAO_SDK_URL = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${process.env.NEXT_PUBLIC_KAKAO_MAP_KEY}&libraries=services,clusterer&autoload=false`;
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -31,10 +29,6 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Script 
-          src={KAKAO_SDK_URL}
-          strategy="beforeInteractive" 
-        />
         <Providers>
           {children}
         </Providers>

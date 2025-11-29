@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { Map, MapMarker, MarkerClusterer } from 'react-kakao-maps-sdk';
+import { Map, MapMarker, MarkerClusterer, useKakaoLoader } from 'react-kakao-maps-sdk';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useCCTVData } from '@/hooks/useCCTVData';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -27,6 +27,12 @@ interface Bounds {
 }
 
 export default function MapContainer() {
+  // Load Kakao Maps SDK
+  const [ isKakaoLoading, kakaoError ] = useKakaoLoader({
+    appkey: process.env.NEXT_PUBLIC_KAKAO_MAP_KEY as string,
+    libraries: ['services', 'clusterer'],
+  });
+
   const { location, isLoading: isGeoLoading, error: geoError } = useGeolocation();
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [selectedCCTV, setSelectedCCTV] = useState<CCTV | null>(null);
@@ -71,6 +77,30 @@ export default function MapContainer() {
     }
   };
 
+  // 1. Check Kakao SDK Error
+  if (kakaoError) {
+    return (
+      <div className="w-full h-[100dvh] flex items-center justify-center bg-gray-100 flex-col p-4 text-center">
+        <p className="text-red-500 font-bold mb-2">지도 로드 실패</p>
+        <p className="text-sm text-gray-600 mb-4">{kakaoError.message}</p>
+        <p className="text-xs text-gray-500">.env.local 파일에 NEXT_PUBLIC_KAKAO_MAP_KEY가 올바르게 설정되었는지 확인해주세요.</p>
+      </div>
+    );
+  }
+
+  // 2. Check Kakao SDK Loading
+  if (isKakaoLoading) {
+    return (
+      <div className="w-full h-[100dvh] flex items-center justify-center bg-gray-100">
+        <div className="space-y-4 text-center">
+          <Skeleton className="w-[200px] h-[20px] rounded-full mx-auto" />
+          <p className="text-muted-foreground">지도를 불러오는 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 3. Check Geolocation Loading
   if (isGeoLoading) {
     return (
       <div className="w-full h-[100dvh] flex flex-col items-center justify-center bg-gray-100 space-y-4">
@@ -80,6 +110,7 @@ export default function MapContainer() {
     );
   }
 
+  // 4. Check Geolocation Error
   if (geoError) {
     return (
       <div className="w-full h-[100dvh] flex items-center justify-center bg-gray-100">
