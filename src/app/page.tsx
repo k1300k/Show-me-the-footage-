@@ -138,13 +138,13 @@ export default function HomePage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: '안녕하세요! 전국 CCTV 실시간 영상 서비스입니다.',
+      text: '🎥 전국 CCTV 실시간 모니터링',
       timestamp: new Date(),
       sender: 'system',
     },
     {
       id: '2',
-      text: '원하시는 지역이나 도로명을 말씀해주세요. (예: "강남역 보여줘")',
+      text: '지역명, 도로명, 지하철역을 검색해보세요!\n(예: 강남역, 올림픽대로, 광화문)',
       timestamp: new Date(),
       sender: 'system',
     },
@@ -166,9 +166,11 @@ export default function HomePage() {
     return extractKeywordsFromCCTVs(allCCTVList);
   }, [allCCTVList]);
 
+  // 초기 로드 시 모든 CCTV를 표시
   useEffect(() => {
-    if (allCCTVList) {
+    if (allCCTVList && allCCTVList.length > 0) {
       setFilteredCCTVs(allCCTVList);
+      setShowCCTVList(true); // 모바일에서도 초기에 목록 표시
     }
   }, [allCCTVList]);
 
@@ -384,41 +386,55 @@ export default function HomePage() {
                   </Card>
                 ))}
               </div>
-            ) : filteredCCTVs.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
-                {filteredCCTVs.map((cctv) => (
-                  <Card
-                    key={cctv.id}
-                    className="cursor-pointer active:scale-95 transition-transform"
-                    onClick={() => handleCCTVClick(cctv)}
-                  >
-                    <CardContent className="p-0">
-                      <div className="relative aspect-video bg-gray-900 rounded-t-lg overflow-hidden">
-                        <ImageViewer
-                          src={cctv.imageUrl}
-                          alt={cctv.name}
-                          autoRefresh={false}
-                        />
-                        {cctv.status === 'NORMAL' && (
-                          <Badge className="absolute top-1 right-1 text-xs bg-green-500">
-                            LIVE
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="p-2">
-                        <h3 className="font-semibold text-xs truncate" title={cctv.name}>
-                          {cctv.name}
-                        </h3>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+            ) : filteredCCTVs.length > 0 || (allCCTVList && allCCTVList.length > 0) ? (
+              <>
+                {/* 초기 안내 메시지 */}
+                {filteredCCTVs.length === (allCCTVList?.length || 0) && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+                    <p className="text-xs text-blue-800 font-medium">
+                      🎥 전국 CCTV {allCCTVList?.length || 0}곳
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      지역명이나 도로명을 검색해보세요
+                    </p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  {(filteredCCTVs.length > 0 ? filteredCCTVs : allCCTVList || []).map((cctv) => (
+                    <Card
+                      key={cctv.id}
+                      className="cursor-pointer active:scale-95 transition-transform"
+                      onClick={() => handleCCTVClick(cctv)}
+                    >
+                      <CardContent className="p-0">
+                        <div className="relative aspect-video bg-gray-900 rounded-t-lg overflow-hidden">
+                          <ImageViewer
+                            src={cctv.imageUrl}
+                            alt={cctv.name}
+                            autoRefresh={false}
+                          />
+                          {cctv.status === 'NORMAL' && (
+                            <Badge className="absolute top-1 right-1 text-xs bg-green-500">
+                              LIVE
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="p-2">
+                          <h3 className="font-semibold text-xs truncate" title={cctv.name}>
+                            {cctv.name}
+                          </h3>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </>
             ) : (
               <div className="text-center py-20 text-gray-500">
                 <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">검색어를 입력해주세요</p>
-                <p className="text-xs mt-2">예: 강남역, 올림픽대로</p>
+                <p className="text-sm font-medium">전국 CCTV 모니터링</p>
+                <p className="text-xs mt-2">검색어를 입력하거나 해시태그를 클릭하세요</p>
+                <p className="text-xs mt-1 text-gray-400">예: 강남역, 올림픽대로, 테헤란로</p>
               </div>
             )}
             </div>
