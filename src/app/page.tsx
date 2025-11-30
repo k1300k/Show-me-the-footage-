@@ -161,8 +161,10 @@ export default function HomePage() {
   const { location, error: geoError } = useGeolocation();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const [currentAddress, setCurrentAddress] = useState<string>('');
+  const [currentStandardInfo, setCurrentStandardInfo] = useState<any>(null);
   const [locationLoaded, setLocationLoaded] = useState(false);
   const [cctvSource, setCctvSource] = useState<'ktict' | 'its' | 'both'>('its');
+  const [cctvStandardInfo, setCctvStandardInfo] = useState<{ [key: string]: any }>({});
 
   // CCTV 소스 설정 로드
   useEffect(() => {
@@ -259,14 +261,22 @@ export default function HomePage() {
           setFilteredCCTVs(nearbyCCTVs);
           
           // 역 geocoding으로 주소 가져오기
-          fetch(`/api/geocode?lat=${lat}&lng=${lng}`)
-            .then(res => res.json())
-            .then(data => {
-              if (data.address) {
-                setCurrentAddress(data.address);
+          Promise.all([
+            fetch(`/api/geocode?lat=${lat}&lng=${lng}`).then(res => res.json()),
+            fetch(`/api/vworld?lat=${lat}&lng=${lng}`).then(res => res.json()).catch(() => null),
+          ])
+            .then(([geocodeData, vworldData]) => {
+              if (geocodeData.address) {
+                setCurrentAddress(geocodeData.address);
+                
+                // 국가표준링크 정보 저장
+                if (vworldData?.success) {
+                  setCurrentStandardInfo(vworldData);
+                }
+                
                 setMessages(prev => [...prev, {
                   id: Date.now().toString(),
-                  text: `📍 현재 위치: ${data.address}\n🎥 주변 CCTV ${nearbyCCTVs.length}곳을 찾았습니다.`,
+                  text: `📍 현재 위치: ${geocodeData.address}\n🎥 주변 CCTV ${nearbyCCTVs.length}곳을 찾았습니다.`,
                   timestamp: new Date(),
                   sender: 'system',
                 }]);
@@ -318,6 +328,23 @@ export default function HomePage() {
     setSelectedCCTV(cctv);
     setIsSheetOpen(true);
     setShowVideo(false);
+    
+    // CCTV 좌표에 대한 국가표준링크 정보 가져오기
+    if (!cctvStandardInfo[cctv.id]) {
+      fetch(`/api/vworld?lat=${cctv.coord.lat}&lng=${cctv.coord.lng}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data?.success) {
+            setCctvStandardInfo(prev => ({
+              ...prev,
+              [cctv.id]: data,
+            }));
+          }
+        })
+        .catch(err => {
+          console.error('Failed to fetch standard info for CCTV:', err);
+        });
+    }
     
     const systemMsg: Message = {
       id: Date.now().toString(),
@@ -588,29 +615,37 @@ export default function HomePage() {
                       </span>
                       <span className="text-xs text-blue-800 font-medium truncate flex-1">{currentAddress}</span>
                     </div>
+                    {/* 국가표준링크 정보 */}
+                    {currentStandardInfo && (
+                      <div className="text-[10px] text-gray-600 space-y-1">
+                        {currentStandardInfo.administrative && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="font-medium">행정구역:</span>
+                            <span>{[currentStandardInfo.administrative.sido, currentStandardInfo.administrative.sigungu, currentStandardInfo.administrative.dong].filter(Boolean).join(' ')}</span>
+                          </div>
+                        )}
+                        {currentStandardInfo.coord && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <span className="font-medium">좌표:</span>
+                            <span>위도 {currentStandardInfo.coord.lat.toFixed(6)}, 경도 {currentStandardInfo.coord.lng.toFixed(6)}</span>
+                            <span className="text-gray-400">({currentStandardInfo.coord.epsg})</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-[10px] text-gray-500">국가표준링크:</span>
-                      {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => {
-                        const linkNames: { [key: string]: string } = {
-                          vworld: 'VWorld',
-                          vworldKSID: 'KSID',
-                          vworldCoord: 'VWorld좌표',
-                          naver: '네이버',
-                          kakao: '카카오',
-                          google: '구글',
-                        };
-                        return (
-                          <a
-                            key={key}
-                            href={url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[10px] text-blue-600 hover:text-blue-800 underline px-1"
-                          >
-                            {linkNames[key] || key}
-                          </a>
-                        );
-                      })}
+                      {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => (
+                        <a
+                          key={key}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-600 hover:text-blue-800 underline px-1"
+                        >
+                          {getLinkName(key)}
+                        </a>
+                      ))}
                     </div>
                   </div>
                 )}
@@ -945,29 +980,37 @@ export default function HomePage() {
                           </span>
                           <span className="text-blue-800 font-medium">{currentAddress}</span>
                         </div>
+                        {/* 국가표준링크 정보 */}
+                        {currentStandardInfo && (
+                          <div className="text-xs text-gray-500 ml-4 space-y-0.5">
+                            {currentStandardInfo.administrative && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">행정구역:</span>
+                                <span>{[currentStandardInfo.administrative.sido, currentStandardInfo.administrative.sigungu, currentStandardInfo.administrative.dong].filter(Boolean).join(' ')}</span>
+                              </div>
+                            )}
+                            {currentStandardInfo.coord && (
+                              <div className="flex items-center gap-1">
+                                <span className="font-medium">좌표:</span>
+                                <span>위도 {currentStandardInfo.coord.lat.toFixed(6)}, 경도 {currentStandardInfo.coord.lng.toFixed(6)}</span>
+                                <span className="text-gray-400">({currentStandardInfo.coord.epsg})</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
                         <div className="flex items-center gap-2 text-xs text-gray-500 ml-4">
                           <span>국가표준링크:</span>
-                          {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => {
-                            const linkNames: { [key: string]: string } = {
-                              vworld: 'VWorld',
-                              vworldKSID: 'KSID',
-                              vworldCoord: 'VWorld좌표',
-                              naver: '네이버',
-                              kakao: '카카오',
-                              google: '구글',
-                            };
-                            return (
-                              <a
-                                key={key}
-                                href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-                                className="text-blue-600 hover:text-blue-800 hover:underline"
-                              >
-                                {linkNames[key] || key}
-                              </a>
-                            );
-                          })}
+                          {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => (
+                            <a
+                              key={key}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {getLinkName(key)}
+                            </a>
+                          ))}
                         </div>
                       </div>
                     )}
@@ -1125,6 +1168,34 @@ export default function HomePage() {
             <div className="mt-4 text-sm text-gray-500 space-y-2">
               <p>출처: {selectedCCTV?.source === 'ITS' ? '국가 ITS CCTV' : '기본형 (고화질)'}</p>
               <p className="text-xs">ID: {selectedCCTV?.id} {selectedCCTV?.direction && `| ${selectedCCTV.direction}`}</p>
+              {/* 국가표준링크 정보 */}
+              {selectedCCTV && cctvStandardInfo[selectedCCTV.id] && (
+                <div className="text-xs text-gray-600 space-y-1 border-t pt-2 mt-2">
+                  {cctvStandardInfo[selectedCCTV.id].administrative && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="font-medium">행정구역:</span>
+                      <span>{[
+                        cctvStandardInfo[selectedCCTV.id].administrative.sido,
+                        cctvStandardInfo[selectedCCTV.id].administrative.sigungu,
+                        cctvStandardInfo[selectedCCTV.id].administrative.dong
+                      ].filter(Boolean).join(' ')}</span>
+                    </div>
+                  )}
+                  {cctvStandardInfo[selectedCCTV.id].coord && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="font-medium">좌표:</span>
+                      <span>위도 {cctvStandardInfo[selectedCCTV.id].coord.lat.toFixed(6)}, 경도 {cctvStandardInfo[selectedCCTV.id].coord.lng.toFixed(6)}</span>
+                      <span className="text-gray-400">({cctvStandardInfo[selectedCCTV.id].coord.epsg})</span>
+                    </div>
+                  )}
+                  {cctvStandardInfo[selectedCCTV.id].location?.roadName && (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="font-medium">도로명:</span>
+                      <span>{cctvStandardInfo[selectedCCTV.id].location.roadName}</span>
+                    </div>
+                  )}
+                </div>
+              )}
               {selectedCCTV && (
                 <div className="flex items-center gap-2 text-xs">
                   <span className="text-gray-400">국가표준링크:</span>
@@ -1136,7 +1207,7 @@ export default function HomePage() {
                       rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-800 hover:underline"
                     >
-                      {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                      {getLinkName(key)}
                     </a>
                   ))}
                 </div>
