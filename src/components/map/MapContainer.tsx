@@ -234,6 +234,7 @@ function MapCenterController({ center }: { center: [number, number] | null }) {
 export default function MapContainer() {
   const [isClient, setIsClient] = useState(false);
   const { location, isLoading: isGeoLoading } = useGeolocation();
+  const [locationInitialized, setLocationInitialized] = useState(false);
   // 초기 bounds를 서울 전체를 포함하도록 설정
   const [bounds, setBounds] = useState<Bounds>({
     minX: 126.0,
@@ -247,7 +248,7 @@ export default function MapContainer() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: '지도에서 CCTV를 검색하거나 마커를 클릭해주세요.',
+      text: '현재 위치를 찾는 중입니다...',
       timestamp: new Date(),
       sender: 'system',
     },
@@ -261,6 +262,68 @@ export default function MapContainer() {
   const cctvArray = cctvList || [];
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
 
+  // 현재 위치 기반으로 bounds 설정 및 주변 CCTV 필터링
+  useEffect(() => {
+    if (location && !locationInitialized) {
+      const lat = location.lat;
+      const lng = location.lng;
+      const radius = 0.05; // 약 5km 반경
+      
+      // 현재 위치 기준 bounds 설정
+      const newBounds: Bounds = {
+        minX: lng - radius,
+        maxX: lng + radius,
+        minY: lat - radius,
+        maxY: lat + radius,
+      };
+      
+      setBounds(newBounds);
+      setSearchCenter([lat, lng]);
+      setLocationInitialized(true);
+      
+      // 안내 메시지 업데이트
+      setMessages([
+        {
+          id: '1',
+          text: `📍 현재 위치 주변 CCTV를 표시합니다.\n검색창에서 원하는 지역을 검색하거나 마커를 클릭해주세요.`,
+          timestamp: new Date(),
+          sender: 'system',
+        },
+      ]);
+    }
+  }, [location, locationInitialized]);
+
+  // 서울 전체 CCTV를 볼 수 있는 중심점과 줌 레벨
+  const defaultCenter: [number, number] = [37.5400, 127.0000]; // 서울 중심
+  const defaultZoom = 12; // 서울 전체가 보이는 줌 레벨
+  
+  // 현재 위치가 있으면 현재 위치로, 없으면 서울 중심으로
+  const center: [number, number] = location 
+    ? [location.lat, location.lng] 
+    : defaultCenter;
+  
+  // 현재 위치가 있으면 줌 레벨을 더 가깝게 (주변 CCTV 보기)
+  const zoom = location ? 14 : defaultZoom;
+  
+  // 현재 위치 주변 CCTV 필터링 (반경 약 5km)
+  const nearbyCCTVs = useMemo(() => {
+    if (!location || cctvArray.length === 0) {
+      return cctvArray; // 위치가 없으면 전체 표시
+    }
+    
+    const lat = location.lat;
+    const lng = location.lng;
+    const radius = 0.05; // 약 5km
+    
+    return cctvArray.filter(cctv => {
+      const distance = Math.sqrt(
+        Math.pow(cctv.coord.lat - lat, 2) + 
+        Math.pow(cctv.coord.lng - lng, 2)
+      );
+      return distance <= radius;
+    });
+  }, [location, cctvArray]);
+
   // 디버깅: CCTV 목록 확인 및 안내 메시지 업데이트
   useEffect(() => {
     console.log('📡 CCTV List loaded:', cctvArray.length, 'items');
@@ -269,28 +332,60 @@ export default function MapContainer() {
       cctvArray.slice(0, 5).forEach(cctv => {
         console.log(`  - ${cctv.name} (${cctv.id}) at [${cctv.coord.lat}, ${cctv.coord.lng}]`);
       });
-      
-      // 처음 로드되었을 때 안내 메시지 업데이트
-      if (messages.length === 1) {
-        setMessages([
-          {
-            id: '1',
-            text: `CCTV ${cctvArray.length}개를 불러왔습니다. 검색창에서 "강남", "논현", "역삼" 등을 검색해보세요!`,
-            timestamp: new Date(),
-            sender: 'system',
-          },
-        ]);
-      }
     }
   }, [cctvArray]);
 
-  // 서울 전체 CCTV를 볼 수 있는 중심점과 줌 레벨
-  const defaultCenter: [number, number] = [37.5400, 127.0000]; // 서울 중심
-  const defaultZoom = 12; // 서울 전체가 보이는 줌 레벨
-  
-  const center: [number, number] = location 
-    ? [location.lat, location.lng] 
-    : defaultCenter;
+  // 현재 위치 주변 CCTV 개수 표시
+  useEffect(() => {
+    if (location && locationInitialized && cctvArray.length > 0) {
+      if (nearbyCCTVs.length > 0) {
+        setMessages(prev => {
+          const hasLocationMessage = prev.some(msg => msg.text.includes('현재 위치 주변 CCTV'));
+          if (!hasLocationMessage) {
+            return [
+              {
+                id: '1',
+                text: `📍 현재 위치 주변 CCTV ${nearbyCCTVs.length}개를 찾았습니다.\n검색창에서 원하는 지역을 검색하거나 마커를 클릭해주세요.`,
+                timestamp: new Date(),
+                sender: 'system',
+              },
+            ];
+          }
+          return prev;
+        });
+      } else {
+        setMessages(prev => {
+          const hasNoCCTVMessage = prev.some(msg => msg.text.includes('주변에 CCTV가 없습니다'));
+          if (!hasNoCCTVMessage) {
+            return [
+              {
+                id: '1',
+                text: `📍 현재 위치 주변에 CCTV가 없습니다.\n검색창에서 원하는 지역을 검색해보세요.`,
+                timestamp: new Date(),
+                sender: 'system',
+              },
+            ];
+          }
+          return prev;
+        });
+      }
+    } else if (!location && cctvArray.length > 0) {
+      setMessages(prev => {
+        const hasDefaultMessage = prev.some(msg => msg.text.includes('CCTV') && msg.text.includes('개를 불러왔습니다'));
+        if (!hasDefaultMessage) {
+          return [
+            {
+              id: '1',
+              text: `CCTV ${cctvArray.length}개를 불러왔습니다. 검색창에서 "강남", "논현", "역삼" 등을 검색해보세요!`,
+              timestamp: new Date(),
+              sender: 'system',
+            },
+          ];
+        }
+        return prev;
+      });
+    }
+  }, [location, nearbyCCTVs, locationInitialized, cctvArray]);
 
   // 해시태그 키워드 추출
   const hashtagKeywords = useMemo(() => {
@@ -515,7 +610,7 @@ export default function MapContainer() {
       {/* 지도 */}
       <LeafletMap
         center={center}
-        zoom={defaultZoom}
+        zoom={zoom}
         style={{ width: '100%', height: '100%' }}
         className="z-0"
       >
@@ -527,8 +622,8 @@ export default function MapContainer() {
         <MapBoundsUpdater onBoundsChange={setBounds} />
         <MapCenterController center={searchCenter} />
 
-        {/* CCTV 마커 */}
-        {cctvArray.map((cctv) => {
+        {/* CCTV 마커 - 현재 위치 주변 CCTV만 표시 */}
+        {nearbyCCTVs.map((cctv) => {
           const isSearchResult = searchResults.some(result => result.id === cctv.id);
           return (
             <Marker
