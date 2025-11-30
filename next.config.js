@@ -9,9 +9,8 @@ const nextConfig = {
       },
     ],
   },
-  // Vercel 배포 최적화
-  swcMinify: true,
 };
 
 module.exports = nextConfig;
+
 

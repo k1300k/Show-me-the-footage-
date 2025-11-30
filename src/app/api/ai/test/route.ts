@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           model: 'claude-3-haiku-20240307',
-          max_tokens': 10,
+          max_tokens: 10,
           messages: [{ role: 'user', content: 'test' }],
         }),
       });
@@ -68,4 +68,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
 

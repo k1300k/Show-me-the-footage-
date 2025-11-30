@@ -30,7 +30,17 @@ interface AIConfig {
   enabled: boolean;
 }
 
-const AI_ENGINES = {
+interface AIEngineInfo {
+  name: string;
+  description: string;
+  color: string;
+  icon: string;
+  requiresKey: boolean;
+  pricing: string;
+  link?: string;
+}
+
+const AI_ENGINES: Record<'none' | 'openai' | 'gemini' | 'claude', AIEngineInfo> = {
   none: {
     name: '사용 안 함',
     description: '기본 키워드 매칭 방식',

@@ -12,19 +12,9 @@ export interface CCTV {
   status?: 'NORMAL' | 'ERROR'; // 실시간 상태
 }
 
-// Kakao Maps SDK 타입 확장
-declare global {
-  interface Window {
-    kakao: {
-      maps: {
-        load: (callback: () => void) => void;
-        Map: typeof kakao.maps.Map;
-        LatLng: typeof kakao.maps.LatLng;
-        LatLngBounds: typeof kakao.maps.LatLngBounds;
-        Marker: typeof kakao.maps.Marker;
-        MarkerClusterer: typeof kakao.maps.MarkerClusterer;
-        services: typeof kakao.maps.services;
-      };
-    };
-  }
+export interface Message {
+  id: string;
+  text: string;
+  timestamp: Date;
+  sender: 'user' | 'system';
 }

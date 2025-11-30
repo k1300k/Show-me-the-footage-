@@ -115,3 +115,4 @@ export default function VideoPlayer({ src, poster, autoPlay = true }: VideoPlaye
   );
 }
 
+
