@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Home, Map, Star, Settings, BookOpen, Info } from 'lucide-react';
+import SearchHistory from '@/components/SearchHistory';
 import UserGuide from '@/components/UserGuide';
 import CCTVSettings from '@/components/CCTVSettings';
 import AISettings from '@/components/AISettings';
@@ -12,9 +13,10 @@ interface MobileLayoutProps {
   children: React.ReactNode;
   viewMode: 'list' | 'map';
   onViewModeChange: (mode: 'list' | 'map') => void;
+  onHistorySearch?: (query: string) => void;
 }
 
-export default function MobileLayout({ children, viewMode, onViewModeChange }: MobileLayoutProps) {
+export default function MobileLayout({ children, viewMode, onViewModeChange, onHistorySearch }: MobileLayoutProps) {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
@@ -28,6 +30,7 @@ export default function MobileLayout({ children, viewMode, onViewModeChange }: M
             </h1>
           </div>
           <div className="flex items-center gap-1">
+            {onHistorySearch && <SearchHistory onSearchSelect={onHistorySearch} />}
             <UserGuide />
             <CCTVSettings />
             <AISettings />

@@ -18,6 +18,7 @@ import ProgramInfo from '@/components/ProgramInfo';
 import AISettings from '@/components/AISettings';
 import UserGuide from '@/components/UserGuide';
 import CCTVSettings from '@/components/CCTVSettings';
+import SearchHistory from '@/components/SearchHistory';
 import MobileLayout from '@/components/MobileLayout';
 
 // Leaflet은 클라이언트 사이드에서만 로드
@@ -204,13 +205,26 @@ export default function HomePage() {
     performSearch(tag);
   };
 
+  // 검색 이력 저장 헬퍼 함수
+  const saveSearchHistory = (query: string, keyword: string, resultCount: number, nlpInfo?: any) => {
+    if (typeof window !== 'undefined' && (window as any).addSearchHistory) {
+      (window as any).addSearchHistory({
+        query,
+        keyword,
+        resultCount,
+        nlpInfo,
+      });
+    }
+  };
+
   // 검색 수행 함수 (공통 로직)
-  const performSearch = async (keyword: string) => {
+  const performSearch = async (keyword: string, originalQuery?: string) => {
     if (!keyword.trim()) return;
 
+    const displayQuery = originalQuery || keyword;
     const userMsg: Message = {
       id: Date.now().toString(),
-      text: keyword,
+      text: displayQuery,
       timestamp: new Date(),
       sender: 'user',
     };
@@ -230,10 +244,17 @@ export default function HomePage() {
         setFilteredCCTVs(directResults);
         setShowCCTVList(true);
 
+        // 검색 이력 저장
+        saveSearchHistory(displayQuery, keyword, directResults.length, {
+          originalQuery: displayQuery,
+          extractedKeyword: keyword,
+          matchType: 'direct',
+        });
+
         setTimeout(() => {
           setMessages(prev => [...prev, {
             id: Date.now().toString(),
-            text: `"${keyword}" 관련 CCTV ${directResults.length}곳을 찾았습니다.`,
+            text: `✅ "${keyword}" 관련 CCTV ${directResults.length}곳을 찾았습니다.\n💡 키워드 추출: "${displayQuery}" → "${keyword}"`,
             timestamp: new Date(),
             sender: 'system',
           }]);
@@ -265,10 +286,17 @@ export default function HomePage() {
             setFilteredCCTVs(nearbyResults);
             setShowCCTVList(true);
             
+            // 검색 이력 저장
+            saveSearchHistory(displayQuery, keyword, nearbyResults.length, {
+              originalQuery: displayQuery,
+              extractedKeyword: keyword,
+              matchType: 'geocoding',
+            });
+
             setTimeout(() => {
               setMessages(prev => [...prev, {
                 id: Date.now().toString(),
-                text: `"${data.address}" 주변 CCTV ${nearbyResults.length}곳을 찾았습니다.`,
+                text: `📍 "${data.address}" 주변 CCTV ${nearbyResults.length}곳을 찾았습니다.\n💡 위치 검색: "${displayQuery}" → "${data.address}"`,
                 timestamp: new Date(),
                 sender: 'system',
               }]);
@@ -305,14 +333,15 @@ export default function HomePage() {
   const sendMessage = () => {
     if (!inputMessage.trim()) return;
 
+    const originalQuery = inputMessage;
     const keyword = extractKeyword(inputMessage);
-    console.log(`Extracted Keyword: ${keyword}`);
+    console.log(`🔍 NLP 처리 | 원문: "${originalQuery}" → 키워드: "${keyword}"`);
 
     if (!keyword) {
       setTimeout(() => {
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
-          text: '검색할 장소명을 정확히 입력해주세요.',
+          text: '검색할 장소명을 정확히 입력해주세요.\n예: 강남역 보여줘, 올림픽대로 상황',
           timestamp: new Date(),
           sender: 'system',
         }]);
@@ -320,7 +349,14 @@ export default function HomePage() {
       return;
     }
 
-    performSearch(keyword);
+    performSearch(keyword, originalQuery);
+  };
+
+  // 검색 이력에서 재검색
+  const handleHistorySearch = (query: string) => {
+    setInputMessage(query);
+    const keyword = extractKeyword(query);
+    performSearch(keyword || query, query);
   };
 
   const handleSearchClick = () => {
@@ -337,7 +373,7 @@ export default function HomePage() {
   // 모바일 환경 렌더링
   if (deviceInfo.isMobile) {
     return (
-      <MobileLayout viewMode={viewMode} onViewModeChange={setViewMode}>
+      <MobileLayout viewMode={viewMode} onViewModeChange={setViewMode} onHistorySearch={handleHistorySearch}>
         {viewMode === 'map' ? (
           // 지도 뷰
           <div className="h-full w-full">
@@ -545,6 +581,7 @@ export default function HomePage() {
                 지도
               </Button>
             </div>
+            <SearchHistory onSearchSelect={handleHistorySearch} />
             <UserGuide />
             <CCTVSettings />
             <AISettings />
