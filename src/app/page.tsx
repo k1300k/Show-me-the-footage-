@@ -662,7 +662,33 @@ export default function HomePage() {
                     )}
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-[10px] text-gray-500">국가표준링크:</span>
-                      {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => (
+                      {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress || '현재 위치')).map(([key, url]) => (
+                        <a
+                          key={key}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-600 hover:text-blue-800 underline px-1"
+                        >
+                          {getLinkName(key)}
+                        </a>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 현재 위치가 있지만 주소가 아직 로드되지 않은 경우 */}
+                {location && !currentAddress && (
+                  <div className="flex flex-col gap-2 bg-blue-50 rounded-lg p-2 border border-blue-200">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2 w-2 flex-shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                      </span>
+                      <span className="text-xs text-blue-800 font-medium">위치 확인 중...</span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[10px] text-gray-500">국가표준링크:</span>
+                      {Object.entries(getStandardMapLinks(location.lat, location.lng, '현재 위치')).map(([key, url]) => (
                         <a
                           key={key}
                           href={url}
@@ -1037,7 +1063,34 @@ export default function HomePage() {
                         )}
                         <div className="flex items-center gap-2 text-xs text-gray-500 ml-4">
                           <span>국가표준링크:</span>
-                          {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => (
+                          {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress || '현재 위치')).map(([key, url]) => (
+                            <a
+                              key={key}
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {getLinkName(key)}
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {location && !currentAddress && (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-sm font-normal text-gray-500">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-gray-500"></span>
+                            </span>
+                            주소 확인 중...
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 ml-4">
+                          <span>국가표준링크:</span>
+                          {Object.entries(getStandardMapLinks(location.lat, location.lng, '현재 위치')).map(([key, url]) => (
                             <a
                               key={key}
                               href={url}
@@ -1049,17 +1102,6 @@ export default function HomePage() {
                             </a>
                           ))}
                         </div>
-                      </div>
-                    )}
-                    {location && !currentAddress && (
-                      <div className="flex items-center gap-2 text-sm font-normal text-gray-500">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-gray-500"></span>
-                          </span>
-                          주소 확인 중...
-                        </span>
                       </div>
                     )}
                   </div>
@@ -1250,12 +1292,12 @@ export default function HomePage() {
                     <a
                       key={key}
                       href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+            target="_blank"
+            rel="noopener noreferrer"
                       className="text-blue-600 hover:text-blue-800 hover:underline"
-                    >
+          >
                       {getLinkName(key)}
-                    </a>
+          </a>
                   ))}
                 </div>
               )}
