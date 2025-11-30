@@ -140,13 +140,13 @@ export default function HomePage() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: '🎥 전국 CCTV 실시간 모니터링',
+      text: '👋 안녕하세요! 전국 CCTV 실시간 모니터링 서비스입니다.',
       timestamp: new Date(),
       sender: 'system',
     },
     {
       id: '2',
-      text: '지역명, 도로명, 지하철역을 검색해보세요!\n(예: 강남역, 올림픽대로, 광화문)',
+      text: '💡 자연어로 편하게 질문하세요!\n\n예시:\n• "강남역 보여줘"\n• "올림픽대로 상황 어때?"\n• "춘천 CCTV 확인"\n• "부산 해운대"\n\n✨ 입력하신 문장에서 자동으로 키워드를 추출하여 검색합니다!',
       timestamp: new Date(),
       sender: 'system',
     },
@@ -341,12 +341,24 @@ export default function HomePage() {
       setTimeout(() => {
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
-          text: '검색할 장소명을 정확히 입력해주세요.\n예: 강남역 보여줘, 올림픽대로 상황',
+          text: '❌ 검색어를 인식할 수 없습니다.\n\n💡 이렇게 검색해보세요:\n• "강남역 보여줘"\n• "올림픽대로 상황"\n• "춘천 CCTV"\n• "부산 해운대"',
           timestamp: new Date(),
           sender: 'system',
         }]);
       }, 500);
       return;
+    }
+
+    // NLP 처리 중 메시지 추가
+    if (originalQuery !== keyword) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          id: Date.now().toString() + '_nlp',
+          text: `🔍 자연어 처리 중...\n\n입력: "${originalQuery}"\n추출된 키워드: "${keyword}"`,
+          timestamp: new Date(),
+          sender: 'system',
+        }]);
+      }, 200);
     }
 
     performSearch(keyword, originalQuery);
@@ -597,11 +609,20 @@ export default function HomePage() {
       <div className="flex-1 overflow-hidden relative">
         {viewMode === 'list' ? (
           <div className="h-full max-w-7xl mx-auto flex flex-col gap-4 p-4">
-            <Card className="flex flex-col h-64 md:h-80">
-              <CardHeader className="flex-shrink-0 pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <MessageSquare className="w-5 h-5" />
-                  메시지
+            <Card className="flex flex-col h-64 md:h-80 border-2 border-purple-200 shadow-lg">
+              <CardHeader className="flex-shrink-0 pb-3 bg-gradient-to-r from-purple-50 to-blue-50">
+                <CardTitle className="flex items-center justify-between text-lg">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-purple-600" />
+                    <span>💬 자연어 대화</span>
+                  </div>
+                  <Badge variant="outline" className="bg-white text-purple-700 border-purple-300">
+                    <span className="relative flex h-2 w-2 mr-1">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </span>
+                    실시간
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 flex flex-col min-h-0 p-4 pt-0">
@@ -615,11 +636,11 @@ export default function HomePage() {
                         className={`max-w-[80%] rounded-lg p-3 ${
                           msg.sender === 'user'
                             ? 'bg-blue-500 text-white'
-                            : 'bg-gray-200 text-gray-900'
+                            : 'bg-gradient-to-r from-purple-50 to-blue-50 text-gray-900 border border-purple-200 shadow-sm'
                         }`}
                       >
-                        <p className="text-sm">{msg.text}</p>
-                        <p className="text-xs mt-1 opacity-70">
+                        <p className="text-sm whitespace-pre-line leading-relaxed">{msg.text}</p>
+                        <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'opacity-70' : 'text-gray-500'}`}>
                           {msg.timestamp.toLocaleTimeString('ko-KR', {
                             hour: '2-digit',
                             minute: '2-digit',
@@ -628,6 +649,7 @@ export default function HomePage() {
                       </div>
                     </div>
                   ))}
+                  <div ref={(el) => el?.scrollIntoView({ behavior: 'smooth' })} />
                 </div>
                 <div className="flex gap-2 flex-shrink-0 mb-2">
                   <Input
@@ -661,10 +683,16 @@ export default function HomePage() {
                 </div>
               </CardContent>
             </Card>
-            <Card className="flex-1 flex flex-col min-h-0">
-              <CardHeader className="flex-shrink-0 pb-3">
-                <CardTitle className="text-lg">
-                  검색 결과 ({filteredCCTVs.length}개)
+            <Card className="flex-1 flex flex-col min-h-0 border-2 border-blue-200 shadow-lg">
+              <CardHeader className="flex-shrink-0 pb-3 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <CardTitle className="flex items-center justify-between text-lg">
+                  <div className="flex items-center gap-2">
+                    <Video className="w-5 h-5 text-blue-600" />
+                    <span>📹 검색 결과</span>
+                  </div>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                    {filteredCCTVs.length}곳
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 pt-0">
