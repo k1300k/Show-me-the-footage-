@@ -29,7 +29,7 @@ interface CCTVConfig {
 
 const CCTV_SOURCES = {
   ktict: {
-    name: 'KT ICT CCTV',
+    name: '기본형 (고화질)',
     description: 'KT ICT 실시간 CCTV (고화질)',
     icon: '📹',
     coverage: '전국 주요 도로 및 교차로',
@@ -48,7 +48,7 @@ const CCTV_SOURCES = {
   },
   both: {
     name: '통합 모드',
-    description: 'KT ICT + 국가 ITS 통합',
+    description: '기본형 + 국가 ITS 통합',
     icon: '🔄',
     coverage: '전국 모든 CCTV',
     quality: '혼합',
@@ -173,13 +173,13 @@ export default function CCTVSettings() {
                 <SelectItem value="ktict">
                   <div className="flex items-center gap-2">
                     <span>📹</span>
-                    <span>KT ICT CCTV</span>
+                    <span>기본형 (고화질)</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="both">
                   <div className="flex items-center gap-2">
                     <span>🔄</span>
-                    <span>통합 모드 (KT ICT + 국가 ITS)</span>
+                    <span>통합 모드 (기본형 + 국가 ITS)</span>
                   </div>
                 </SelectItem>
               </SelectContent>

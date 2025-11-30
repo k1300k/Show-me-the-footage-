@@ -180,9 +180,9 @@ export default function HomePage() {
   // 소스 이름 가져오기
   const getSourceName = () => {
     const sourceNames = {
-      ktict: 'KT ICT CCTV',
+      ktict: '기본형 (고화질)',
       its: '국가 ITS CCTV',
-      both: '통합 모드 (KT ICT + 국가 ITS)',
+      both: '통합 모드',
     };
     return sourceNames[cctvSource];
   };
