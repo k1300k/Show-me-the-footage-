@@ -17,7 +17,69 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // 네이버 Geocoding API 호출
+    // 좌표인지 확인 (lat,lng 형식)
+    const coordMatch = query.match(/^([\d.]+),([\d.]+)$/);
+    if (coordMatch) {
+      const lat = parseFloat(coordMatch[1]);
+      const lng = parseFloat(coordMatch[2]);
+      
+      // 네이버 Reverse Geocoding API 호출
+      if (NAVER_CLIENT_ID && NAVER_CLIENT_SECRET) {
+        try {
+          const response = await axios.get('https://naveropenapi.apigw.ntruss.com/map-reversegeocode/v2/gc', {
+            params: {
+              coords: `${lng},${lat}`, // 네이버는 lng,lat 순서
+              orders: 'roadaddr,addr',
+              output: 'json',
+            },
+            headers: {
+              'X-NCP-APIGW-API-KEY-ID': NAVER_CLIENT_ID,
+              'X-NCP-APIGW-API-KEY': NAVER_CLIENT_SECRET,
+            },
+          });
+
+          if (response.data?.results && response.data.results.length > 0) {
+            const result = response.data.results[0];
+            const region = result.region;
+            const land = result.land;
+            
+            let address = '';
+            if (land?.name && land.name !== 'LAND') {
+              address = land.name; // 도로명 주소
+            } else if (region) {
+              // 지번 주소 조합
+              address = [
+                region.area1?.name,
+                region.area2?.name,
+                region.area3?.name,
+                region.area4?.name,
+              ].filter(Boolean).join(' ');
+            }
+
+            return NextResponse.json({
+              success: true,
+              address: address || '주소 확인 중',
+              lat: lat,
+              lng: lng,
+              source: 'naver_reverse',
+            });
+          }
+        } catch (apiError: any) {
+          console.error('[Naver Reverse Geocoding] Error:', apiError.message);
+        }
+      }
+      
+      // Fallback: 좌표만 반환
+      return NextResponse.json({
+        success: true,
+        address: `위도 ${lat.toFixed(4)}, 경도 ${lng.toFixed(4)}`,
+        lat: lat,
+        lng: lng,
+        source: 'coordinates',
+      });
+    }
+
+    // 주소 검색 (Forward Geocoding)
     if (NAVER_CLIENT_ID && NAVER_CLIENT_SECRET) {
       try {
         const response = await axios.get('https://naveropenapi.apigw.ntruss.com/map-geocode/v2/geocode', {

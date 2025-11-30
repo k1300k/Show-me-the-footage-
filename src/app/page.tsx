@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useCCTVData } from '@/hooks/useCCTVData';
 import { useDeviceDetect } from '@/hooks/useDeviceDetect';
+import { useGeolocation } from '@/hooks/useGeolocation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -157,7 +158,10 @@ export default function HomePage() {
     minX: 126.0, maxX: 128.0, minY: 36.0, maxY: 38.0
   });
   
+  const { location, error: geoError } = useGeolocation();
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+  const [currentAddress, setCurrentAddress] = useState<string>('');
+  const [locationLoaded, setLocationLoaded] = useState(false);
 
   // CCTV 목록에서 해시태그 키워드 추출
   const hashtagKeywords = useMemo(() => {
@@ -168,13 +172,82 @@ export default function HomePage() {
     return extractKeywordsFromCCTVs(allCCTVList);
   }, [allCCTVList]);
 
-  // 초기 로드 시 모든 CCTV를 표시
+  // 현재 위치 기반 CCTV 표시 및 주소 가져오기
   useEffect(() => {
-    if (allCCTVList && allCCTVList.length > 0) {
-      setFilteredCCTVs(allCCTVList);
-      setShowCCTVList(true); // 모바일에서도 초기에 목록 표시
+    if (allCCTVList && allCCTVList.length > 0 && !locationLoaded) {
+      // 위치 정보가 있으면 주변 CCTV 필터링
+      if (location) {
+        const lat = location.lat;
+        const lng = location.lng;
+        const radius = 0.05; // 약 5km
+
+        // 주변 CCTV 필터링
+        const nearbyCCTVs = allCCTVList.filter(cctv => {
+          const distance = Math.sqrt(
+            Math.pow(cctv.coord.lat - lat, 2) + 
+            Math.pow(cctv.coord.lng - lng, 2)
+          );
+          return distance <= radius;
+        });
+
+        if (nearbyCCTVs.length > 0) {
+          setFilteredCCTVs(nearbyCCTVs);
+          
+          // 역 geocoding으로 주소 가져오기
+          fetch(`/api/geocode?query=${lat},${lng}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.address) {
+                setCurrentAddress(data.address);
+                setMessages(prev => [...prev, {
+                  id: Date.now().toString(),
+                  text: `📍 현재 위치: ${data.address}\n🎥 주변 CCTV ${nearbyCCTVs.length}곳을 찾았습니다.`,
+                  timestamp: new Date(),
+                  sender: 'system',
+                }]);
+              }
+            })
+            .catch(() => {
+              setCurrentAddress('위치 확인 중...');
+              setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                text: `📍 현재 위치 근처\n🎥 주변 CCTV ${nearbyCCTVs.length}곳을 찾았습니다.`,
+                timestamp: new Date(),
+                sender: 'system',
+              }]);
+            });
+        } else {
+          // 주변에 CCTV가 없으면 전체 표시
+          setFilteredCCTVs(allCCTVList);
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            text: `📍 현재 위치 주변에 CCTV가 없습니다.\n전체 CCTV ${allCCTVList.length}곳을 표시합니다.`,
+            timestamp: new Date(),
+            sender: 'system',
+          }]);
+        }
+        
+        setLocationLoaded(true);
+        setShowCCTVList(true);
+      } else if (geoError) {
+        // 위치 권한 거부 시 전체 표시
+        setFilteredCCTVs(allCCTVList);
+        setShowCCTVList(true);
+        setLocationLoaded(true);
+        
+        setMessages(prev => [...prev, {
+          id: Date.now().toString(),
+          text: `ℹ️ 위치 권한이 필요합니다.\n전체 CCTV ${allCCTVList.length}곳을 표시합니다.\n\n💡 위치 기반 검색을 원하시면 브라우저 설정에서 위치 권한을 허용해주세요.`,
+          timestamp: new Date(),
+          sender: 'system',
+        }]);
+      } else {
+        // 위치 로딩 중이면 전체 표시
+        setFilteredCCTVs(allCCTVList);
+        setShowCCTVList(true);
+      }
     }
-  }, [allCCTVList]);
+  }, [allCCTVList, location, geoError, locationLoaded]);
 
   const handleCCTVClick = (cctv: CCTV) => {
     setSelectedCCTV(cctv);
@@ -685,14 +758,39 @@ export default function HomePage() {
             </Card>
             <Card className="flex-1 flex flex-col min-h-0 border-2 border-blue-200 shadow-lg">
               <CardHeader className="flex-shrink-0 pb-3 bg-gradient-to-r from-blue-50 to-indigo-50">
-                <CardTitle className="flex items-center justify-between text-lg">
-                  <div className="flex items-center gap-2">
-                    <Video className="w-5 h-5 text-blue-600" />
-                    <span>📹 검색 결과</span>
+                <CardTitle className="flex flex-col gap-2 text-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Video className="w-5 h-5 text-blue-600" />
+                      <span>📹 CCTV 목록</span>
+                    </div>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                      {filteredCCTVs.length}곳
+                    </Badge>
                   </div>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                    {filteredCCTVs.length}곳
-                  </Badge>
+                  {currentAddress && (
+                    <div className="flex items-center gap-2 text-sm font-normal text-gray-600">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                        </span>
+                        현재 위치
+                      </span>
+                      <span className="text-blue-800 font-medium">{currentAddress}</span>
+                    </div>
+                  )}
+                  {location && !currentAddress && (
+                    <div className="flex items-center gap-2 text-sm font-normal text-gray-500">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-gray-500"></span>
+                        </span>
+                        주소 확인 중...
+                      </span>
+                    </div>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 pt-0">
