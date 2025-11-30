@@ -322,7 +322,7 @@ export default function HomePage() {
       setTimeout(() => {
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
-          text: `"${keyword}"에 대한 CCTV 정보를 찾을 수 없습니다.\n(예: 강남역, 서초동, 테헤란로)`,
+          text: `❌ "${keyword}"에 대한 CCTV 정보를 찾을 수 없습니다.\n\n💡 팁:\n1. 샘플 데이터는 주요 도시만 포함됩니다\n2. 전국 CCTV를 보려면 헤더의 📹 버튼을 클릭하여\n   "국가 ITS" 또는 "통합 모드"로 변경하세요\n3. 검색 예시: 강남역, 춘천역, 부산 해운대`,
           timestamp: new Date(),
           sender: 'system',
         }]);
