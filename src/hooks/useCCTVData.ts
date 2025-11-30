@@ -26,18 +26,18 @@ interface CCTVResponse {
 
 // CCTV 소스 설정 가져오기
 const getCCTVSource = (): 'ktict' | 'its' | 'both' => {
-  if (typeof window === 'undefined') return 'ktict';
+  if (typeof window === 'undefined') return 'its';
   
   try {
     const config = localStorage.getItem('cctv_config');
     if (config) {
       const parsed = JSON.parse(config);
-      return parsed.source || 'ktict';
+      return parsed.source || 'its';
     }
   } catch (e) {
     console.error('Failed to parse CCTV config:', e);
   }
-  return 'ktict';
+  return 'its';
 };
 
 export const fetchCCTVData = async (bounds: Bounds) => {

@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     const maxX = parseFloat(searchParams.get('maxX') || '0');
     const minY = parseFloat(searchParams.get('minY') || '0');
     const maxY = parseFloat(searchParams.get('maxY') || '0');
-    const source = searchParams.get('source') || 'ktict'; // 기본값: ktict
+    const source = searchParams.get('source') || 'its'; // 기본값: 국가 ITS
 
     let cctvData: any[] = [];
     const streamAccount = `${CCTV_CO_NAME}_${CCTV_SERVICE_NAME}`;

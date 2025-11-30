@@ -162,7 +162,7 @@ export default function HomePage() {
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const [currentAddress, setCurrentAddress] = useState<string>('');
   const [locationLoaded, setLocationLoaded] = useState(false);
-  const [cctvSource, setCctvSource] = useState<'ktict' | 'its' | 'both'>('ktict');
+  const [cctvSource, setCctvSource] = useState<'ktict' | 'its' | 'both'>('its');
 
   // CCTV 소스 설정 로드
   useEffect(() => {

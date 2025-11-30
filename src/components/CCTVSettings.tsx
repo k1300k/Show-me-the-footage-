@@ -60,7 +60,7 @@ const CCTV_SOURCES = {
 export default function CCTVSettings() {
   const [open, setOpen] = useState(false);
   const [config, setConfig] = useState<CCTVConfig>({
-    source: 'ktict', // 기본값: KT ICT
+    source: 'its', // 기본값: 국가 ITS
   });
 
   // 로컬 스토리지에서 설정 불러오기
@@ -164,16 +164,16 @@ export default function CCTVSettings() {
                 <SelectValue placeholder="CCTV 소스 선택" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ktict">
-                  <div className="flex items-center gap-2">
-                    <span>📹</span>
-                    <span>KT ICT CCTV (기본)</span>
-                  </div>
-                </SelectItem>
                 <SelectItem value="its">
                   <div className="flex items-center gap-2">
                     <span>🚗</span>
-                    <span>국가 ITS CCTV</span>
+                    <span>국가 ITS CCTV (기본)</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="ktict">
+                  <div className="flex items-center gap-2">
+                    <span>📹</span>
+                    <span>KT ICT CCTV</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="both">
