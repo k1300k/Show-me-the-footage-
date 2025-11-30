@@ -187,6 +187,23 @@ export default function HomePage() {
     return sourceNames[cctvSource];
   };
 
+  // 국가표준링크 생성 함수
+  const getStandardMapLinks = (lat: number, lng: number, name?: string) => {
+    const vworldLink = `https://map.vworld.kr/?q=${lat},${lng}`;
+    const naverLink = `https://map.naver.com/v5/search/${encodeURIComponent(name || `${lat},${lng}`)}`;
+    const kakaoLink = name 
+      ? `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`
+      : `https://map.kakao.com/link/map/${lat},${lng}`;
+    const googleLink = `https://www.google.com/maps?q=${lat},${lng}`;
+    
+    return {
+      vworld: vworldLink,
+      naver: naverLink,
+      kakao: kakaoLink,
+      google: googleLink,
+    };
+  };
+
   // CCTV 목록에서 해시태그 키워드 추출
   const hashtagKeywords = useMemo(() => {
     if (!allCCTVList || allCCTVList.length === 0) {
@@ -218,7 +235,7 @@ export default function HomePage() {
           setFilteredCCTVs(nearbyCCTVs);
           
           // 역 geocoding으로 주소 가져오기
-          fetch(`/api/geocode?query=${lat},${lng}`)
+          fetch(`/api/geocode?lat=${lat}&lng=${lng}`)
             .then(res => res.json())
             .then(data => {
               if (data.address) {
@@ -481,7 +498,7 @@ export default function HomePage() {
 
   // 모바일 환경 렌더링
   if (deviceInfo.isMobile) {
-    return (
+  return (
       <MobileLayout viewMode={viewMode} onViewModeChange={setViewMode} onHistorySearch={handleHistorySearch}>
         {viewMode === 'map' ? (
           // 지도 뷰
@@ -538,13 +555,29 @@ export default function HomePage() {
                   </Badge>
                 </div>
                 {/* 현재 위치 */}
-                {currentAddress && (
-                  <div className="flex items-center gap-2 bg-blue-50 rounded-lg p-2 border border-blue-200">
-                    <span className="relative flex h-2 w-2 flex-shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                    </span>
-                    <span className="text-xs text-blue-800 font-medium truncate">{currentAddress}</span>
+                {currentAddress && location && (
+                  <div className="flex flex-col gap-2 bg-blue-50 rounded-lg p-2 border border-blue-200">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2 w-2 flex-shrink-0">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                      </span>
+                      <span className="text-xs text-blue-800 font-medium truncate flex-1">{currentAddress}</span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[10px] text-gray-500">국가표준링크:</span>
+                      {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => (
+                        <a
+                          key={key}
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-blue-600 hover:text-blue-800 underline px-1"
+                        >
+                          {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                        </a>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
@@ -596,6 +629,21 @@ export default function HomePage() {
                           <h3 className="font-semibold text-xs truncate" title={cctv.name}>
                             {cctv.name}
                           </h3>
+                          <div className="flex items-center gap-1 mt-1 flex-wrap">
+                            <span className="text-[10px] text-gray-400">지도:</span>
+                            {Object.entries(getStandardMapLinks(cctv.coord.lat, cctv.coord.lng, cctv.name)).slice(0, 2).map(([key, url]) => (
+                              <a
+                                key={key}
+                                href={url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                              </a>
+                            ))}
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -676,8 +724,24 @@ export default function HomePage() {
                 )}
               </div>
 
-              <div className="mt-3 text-xs text-gray-500">
+              <div className="mt-3 text-xs text-gray-500 space-y-2">
                 <p>ID: {selectedCCTV?.id} {selectedCCTV?.direction && `| ${selectedCCTV.direction}`}</p>
+                {selectedCCTV && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-gray-400">국가표준링크:</span>
+                    {Object.entries(getStandardMapLinks(selectedCCTV.coord.lat, selectedCCTV.coord.lng, selectedCCTV.name)).map(([key, url]) => (
+                      <a
+                        key={key}
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-800 hover:underline"
+                      >
+                        {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </SheetContent>
@@ -835,16 +899,32 @@ export default function HomePage() {
                       </Badge>
                     </div>
                     {/* 현재 위치 정보 */}
-                    {currentAddress && (
-                      <div className="flex items-center gap-2 text-sm font-normal text-gray-600">
-                        <span className="inline-flex items-center gap-1">
-                          <span className="relative flex h-2 w-2">
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    {currentAddress && location && (
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-sm font-normal text-gray-600">
+                          <span className="inline-flex items-center gap-1">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                            </span>
+                            현재 위치:
                           </span>
-                          현재 위치:
-                        </span>
-                        <span className="text-blue-800 font-medium">{currentAddress}</span>
+                          <span className="text-blue-800 font-medium">{currentAddress}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-gray-500 ml-4">
+                          <span>국가표준링크:</span>
+                          {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => (
+                            <a
+                              key={key}
+                              href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+                              className="text-blue-600 hover:text-blue-800 hover:underline"
+                            >
+                              {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                            </a>
+                          ))}
+                        </div>
                       </div>
                     )}
                     {location && !currentAddress && (
@@ -899,6 +979,21 @@ export default function HomePage() {
                               {cctv.name}
                             </h3>
                             <p className="text-xs text-gray-500">ID: {cctv.id}</p>
+                            <div className="flex items-center gap-1 mt-1 flex-wrap">
+                              <span className="text-[10px] text-gray-400">지도:</span>
+                              {Object.entries(getStandardMapLinks(cctv.coord.lat, cctv.coord.lng, cctv.name)).slice(0, 2).map(([key, url]) => (
+                                <a
+                                  key={key}
+                                  href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
+                                >
+                                  {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                                </a>
+                              ))}
+                            </div>
                           </div>
                         </CardContent>
                       </Card>
@@ -983,9 +1078,25 @@ export default function HomePage() {
               )}
             </div>
 
-            <div className="mt-4 text-sm text-gray-500">
-              <p>출처: KT ICT CCTV</p>
-              <p className="text-xs mt-1">ID: {selectedCCTV?.id} {selectedCCTV?.direction && `| ${selectedCCTV.direction}`}</p>
+            <div className="mt-4 text-sm text-gray-500 space-y-2">
+              <p>출처: {selectedCCTV?.source === 'ITS' ? '국가 ITS CCTV' : '기본형 (고화질)'}</p>
+              <p className="text-xs">ID: {selectedCCTV?.id} {selectedCCTV?.direction && `| ${selectedCCTV.direction}`}</p>
+              {selectedCCTV && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-gray-400">국가표준링크:</span>
+                  {Object.entries(getStandardMapLinks(selectedCCTV.coord.lat, selectedCCTV.coord.lng, selectedCCTV.name)).map(([key, url]) => (
+                    <a
+                      key={key}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
         </div>
         </SheetContent>

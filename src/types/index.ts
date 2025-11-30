@@ -8,7 +8,7 @@ export interface CCTV {
   cctvUrl: string; // HLS Stream URL
   imageUrl: string; // JPEG Thumbnail URL
   direction?: string;
-  source: 'KTICT';
+  source: 'KTICT' | 'ITS';
   status?: 'NORMAL' | 'ERROR'; // 실시간 상태
 }
 

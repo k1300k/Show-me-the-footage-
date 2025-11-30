@@ -44,21 +44,43 @@ export async function GET(request: NextRequest) {
             const land = result.land;
             
             let address = '';
+            let roadAddress = '';
+            let jibunAddress = '';
+            
             if (land?.name && land.name !== 'LAND') {
               address = land.name; // 도로명 주소
-            } else if (region) {
+              roadAddress = land.name;
+            }
+            
+            if (region) {
               // 지번 주소 조합
-              address = [
+              jibunAddress = [
                 region.area1?.name,
                 region.area2?.name,
                 region.area3?.name,
                 region.area4?.name,
               ].filter(Boolean).join(' ');
+              
+              if (!address) {
+                address = jibunAddress;
+              }
             }
+
+            // 국가표준링크 생성 (도로명주소 기반)
+            const jibunAddressForLink = [
+              region.area1?.name,
+              region.area2?.name,
+              region.area3?.name,
+            ].filter(Boolean).join(' ');
+            
+            const stdLink = `https://www.juso.go.kr/addrlink/addrLinkUrl.do?keyword=${encodeURIComponent(jibunAddressForLink)}`;
 
             return NextResponse.json({
               success: true,
               address: address || '주소 확인 중',
+              roadAddress,
+              jibunAddress,
+              stdLink,
               lat: lat,
               lng: lng,
               source: 'naver_reverse',
