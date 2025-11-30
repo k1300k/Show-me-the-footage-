@@ -162,6 +162,30 @@ export default function HomePage() {
   const { isFavorite, addFavorite, removeFavorite } = useFavorites();
   const [currentAddress, setCurrentAddress] = useState<string>('');
   const [locationLoaded, setLocationLoaded] = useState(false);
+  const [cctvSource, setCctvSource] = useState<'ktict' | 'its' | 'both'>('ktict');
+
+  // CCTV 소스 설정 로드
+  useEffect(() => {
+    try {
+      const config = localStorage.getItem('cctv_config');
+      if (config) {
+        const parsed = JSON.parse(config);
+        setCctvSource(parsed.source || 'ktict');
+      }
+    } catch (e) {
+      console.error('Failed to load CCTV config:', e);
+    }
+  }, []);
+
+  // 소스 이름 가져오기
+  const getSourceName = () => {
+    const sourceNames = {
+      ktict: 'KT ICT CCTV',
+      its: '국가 ITS CCTV',
+      both: '통합 모드 (KT ICT + 국가 ITS)',
+    };
+    return sourceNames[cctvSource];
+  };
 
   // CCTV 목록에서 해시태그 키워드 추출
   const hashtagKeywords = useMemo(() => {
@@ -497,7 +521,34 @@ export default function HomePage() {
 
             {/* CCTV 그리드 - 스크롤 영역 */}
             <div className="flex-1 overflow-y-auto p-3">
-            {isLoading ? (
+              {/* 상태 정보 배너 */}
+              <div className="mb-3 space-y-2">
+                {/* 데이터 소스 */}
+                <div className="flex items-center justify-between bg-white rounded-lg p-2 shadow-sm border">
+                  <span className="text-xs text-gray-600">데이터 소스</span>
+                  <Badge 
+                    variant="outline" 
+                    className={`text-xs ${
+                      cctvSource === 'ktict' ? 'bg-green-50 text-green-700 border-green-300' :
+                      cctvSource === 'its' ? 'bg-orange-50 text-orange-700 border-orange-300' :
+                      'bg-purple-50 text-purple-700 border-purple-300'
+                    }`}
+                  >
+                    {getSourceName()}
+                  </Badge>
+                </div>
+                {/* 현재 위치 */}
+                {currentAddress && (
+                  <div className="flex items-center gap-2 bg-blue-50 rounded-lg p-2 border border-blue-200">
+                    <span className="relative flex h-2 w-2 flex-shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                    </span>
+                    <span className="text-xs text-blue-800 font-medium truncate">{currentAddress}</span>
+                  </div>
+                )}
+              </div>
+              {isLoading ? (
               <div className="grid grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map((i) => (
                   <Card key={i}>
@@ -768,29 +819,46 @@ export default function HomePage() {
                       {filteredCCTVs.length}곳
                     </Badge>
                   </div>
-                  {currentAddress && (
-                    <div className="flex items-center gap-2 text-sm font-normal text-gray-600">
-                      <span className="inline-flex items-center gap-1">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                        </span>
-                        현재 위치
-                      </span>
-                      <span className="text-blue-800 font-medium">{currentAddress}</span>
+                  <div className="flex flex-col gap-1">
+                    {/* 현재 사용 중인 CCTV 소스 */}
+                    <div className="flex items-center gap-2 text-sm font-normal">
+                      <span className="text-gray-600">데이터 소스:</span>
+                      <Badge 
+                        variant="outline" 
+                        className={`${
+                          cctvSource === 'ktict' ? 'bg-green-50 text-green-700 border-green-300' :
+                          cctvSource === 'its' ? 'bg-orange-50 text-orange-700 border-orange-300' :
+                          'bg-purple-50 text-purple-700 border-purple-300'
+                        }`}
+                      >
+                        {getSourceName()}
+                      </Badge>
                     </div>
-                  )}
-                  {location && !currentAddress && (
-                    <div className="flex items-center gap-2 text-sm font-normal text-gray-500">
-                      <span className="inline-flex items-center gap-1">
-                        <span className="relative flex h-2 w-2">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-gray-500"></span>
+                    {/* 현재 위치 정보 */}
+                    {currentAddress && (
+                      <div className="flex items-center gap-2 text-sm font-normal text-gray-600">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
+                          </span>
+                          현재 위치:
                         </span>
-                        주소 확인 중...
-                      </span>
-                    </div>
-                  )}
+                        <span className="text-blue-800 font-medium">{currentAddress}</span>
+                      </div>
+                    )}
+                    {location && !currentAddress && (
+                      <div className="flex items-center gap-2 text-sm font-normal text-gray-500">
+                        <span className="inline-flex items-center gap-1">
+                          <span className="relative flex h-2 w-2">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-gray-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2 w-2 bg-gray-500"></span>
+                          </span>
+                          주소 확인 중...
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex-1 overflow-y-auto p-4 pt-0">
