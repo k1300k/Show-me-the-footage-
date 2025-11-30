@@ -324,6 +324,33 @@ export default function HomePage() {
     }
   }, [allCCTVList, location, geoError, locationLoaded]);
 
+  // CCTV 목록 로드 시 국가표준링크 정보 미리 가져오기
+  useEffect(() => {
+    if (allCCTVList && allCCTVList.length > 0) {
+      // 화면에 표시되는 CCTV에 대해서만 미리 로드 (성능 최적화)
+      const visibleCCTVs = filteredCCTVs.length > 0 ? filteredCCTVs : allCCTVList.slice(0, 20); // 처음 20개만 미리 로드
+      
+      visibleCCTVs.forEach((cctv) => {
+        // 이미 로드된 정보가 없으면 가져오기
+        if (!cctvStandardInfo[cctv.id]) {
+          fetch(`/api/vworld?lat=${cctv.coord.lat}&lng=${cctv.coord.lng}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data?.success) {
+                setCctvStandardInfo(prev => ({
+                  ...prev,
+                  [cctv.id]: data,
+                }));
+              }
+            })
+            .catch(err => {
+              console.error(`Failed to fetch standard info for CCTV ${cctv.id}:`, err);
+            });
+        }
+      });
+    }
+  }, [allCCTVList, filteredCCTVs]);
+
   const handleCCTVClick = (cctv: CCTV) => {
     setSelectedCCTV(cctv);
     setIsSheetOpen(true);
@@ -698,9 +725,19 @@ export default function HomePage() {
                           <h3 className="font-semibold text-xs truncate" title={cctv.name}>
                             {cctv.name}
                           </h3>
+                          {/* 국가표준링크 정보 */}
+                          {cctvStandardInfo[cctv.id] && (
+                            <div className="text-[10px] text-gray-500 mt-1 space-y-0.5">
+                              {cctvStandardInfo[cctv.id].administrative && (
+                                <div className="truncate">
+                                  {[cctvStandardInfo[cctv.id].administrative.sido, cctvStandardInfo[cctv.id].administrative.sigungu].filter(Boolean).join(' ')}
+                                </div>
+                              )}
+                            </div>
+                          )}
                           <div className="flex items-center gap-1 mt-1 flex-wrap">
-                            <span className="text-[10px] text-gray-400">지도:</span>
-                            {Object.entries(getStandardMapLinks(cctv.coord.lat, cctv.coord.lng, cctv.name)).slice(0, 2).map(([key, url]) => (
+                            <span className="text-[10px] text-gray-400">국가표준링크:</span>
+                            {Object.entries(getStandardMapLinks(cctv.coord.lat, cctv.coord.lng, cctv.name)).slice(0, 3).map(([key, url]) => (
                               <a
                                 key={key}
                                 href={url}
@@ -1004,8 +1041,8 @@ export default function HomePage() {
                             <a
                               key={key}
                               href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+            target="_blank"
+            rel="noopener noreferrer"
                               className="text-blue-600 hover:text-blue-800 hover:underline"
                             >
                               {getLinkName(key)}
@@ -1066,14 +1103,24 @@ export default function HomePage() {
                               {cctv.name}
                             </h3>
                             <p className="text-xs text-gray-500">ID: {cctv.id}</p>
+                            {/* 국가표준링크 정보 */}
+                            {cctvStandardInfo[cctv.id] && (
+                              <div className="text-[10px] text-gray-500 mt-1 space-y-0.5">
+                                {cctvStandardInfo[cctv.id].administrative && (
+                                  <div className="truncate">
+                                    {[cctvStandardInfo[cctv.id].administrative.sido, cctvStandardInfo[cctv.id].administrative.sigungu].filter(Boolean).join(' ')}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                             <div className="flex items-center gap-1 mt-1 flex-wrap">
-                              <span className="text-[10px] text-gray-400">지도:</span>
-                              {Object.entries(getStandardMapLinks(cctv.coord.lat, cctv.coord.lng, cctv.name)).slice(0, 2).map(([key, url]) => (
+                              <span className="text-[10px] text-gray-400">국가표준링크:</span>
+                              {Object.entries(getStandardMapLinks(cctv.coord.lat, cctv.coord.lng, cctv.name)).slice(0, 3).map(([key, url]) => (
                                 <a
                                   key={key}
                                   href={url}
-            target="_blank"
-            rel="noopener noreferrer"
+                                  target="_blank"
+                                  rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
                                   className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
                                 >
