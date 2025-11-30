@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Home, Map, Star, Settings, BookOpen, Info } from 'lucide-react';
 import UserGuide from '@/components/UserGuide';
+import CCTVSettings from '@/components/CCTVSettings';
 import AISettings from '@/components/AISettings';
 import ProgramInfo from '@/components/ProgramInfo';
 
@@ -28,6 +29,7 @@ export default function MobileLayout({ children, viewMode, onViewModeChange }: M
           </div>
           <div className="flex items-center gap-1">
             <UserGuide />
+            <CCTVSettings />
             <AISettings />
             <ProgramInfo />
           </div>

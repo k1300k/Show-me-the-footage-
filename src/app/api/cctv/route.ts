@@ -43,12 +43,13 @@ export async function GET(request: NextRequest) {
     const maxX = parseFloat(searchParams.get('maxX') || '0');
     const minY = parseFloat(searchParams.get('minY') || '0');
     const maxY = parseFloat(searchParams.get('maxY') || '0');
+    const source = searchParams.get('source') || 'ktict'; // 기본값: ktict
 
     let cctvData: any[] = [];
     const streamAccount = `${CCTV_CO_NAME}_${CCTV_SERVICE_NAME}`;
 
-    // 국토부 ITS API 호출 시도
-    if (ITS_API_KEY) {
+    // 국가 ITS API 호출 (source가 'its' 또는 'both'일 때)
+    if ((source === 'its' || source === 'both') && ITS_API_KEY) {
       try {
         console.log('[ITS API] Fetching CCTV data...');
         
@@ -90,9 +91,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fallback 데이터 사용
-    if (cctvData.length === 0) {
-      console.log('[Fallback] Using sample data');
+    // KT ICT CCTV 데이터 추가 (source가 'ktict' 또는 'both'일 때)
+    if (source === 'ktict' || source === 'both' || cctvData.length === 0) {
+      console.log('[KT ICT] Using fallback/sample data');
       
       const filteredData = FALLBACK_CCTV_DATA.filter((row) => {
         return (
@@ -103,7 +104,7 @@ export async function GET(request: NextRequest) {
         );
       });
       
-      cctvData = filteredData.map((row) => ({
+      const ktictData = (filteredData.length > 0 ? filteredData : FALLBACK_CCTV_DATA).map((row) => ({
         cctvname: row.cctv_name,
         cctvid: row.cctv_id,
         imageUrl: `${CCTV_STREAM_BASE}/${streamAccount}/${row.cctv_id}!jpg`,
@@ -112,13 +113,29 @@ export async function GET(request: NextRequest) {
         coordy: row.latitude,
         status: row.status,
         direction: row.direction,
+        source: 'KTICT',
       }));
+
+      // 'both' 모드일 때는 기존 데이터에 추가, 아니면 대체
+      if (source === 'both' && cctvData.length > 0) {
+        cctvData = [...cctvData, ...ktictData];
+      } else {
+        cctvData = ktictData;
+      }
+    }
+
+    // 소스 정보 결정
+    let sourceInfo = 'KTICT';
+    if (source === 'its') {
+      sourceInfo = ITS_API_KEY ? 'ITS_API' : 'SAMPLE_ITS';
+    } else if (source === 'both') {
+      sourceInfo = 'KTICT+ITS';
     }
 
     return NextResponse.json({
       response: {
         data: cctvData,
-        source: ITS_API_KEY ? 'ITS_API' : 'SAMPLE_DATA',
+        source: sourceInfo,
         count: cctvData.length,
       },
     });

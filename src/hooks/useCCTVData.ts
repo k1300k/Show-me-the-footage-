@@ -24,21 +24,42 @@ interface CCTVResponse {
   };
 }
 
+// CCTV 소스 설정 가져오기
+const getCCTVSource = (): 'ktict' | 'its' | 'both' => {
+  if (typeof window === 'undefined') return 'ktict';
+  
+  try {
+    const config = localStorage.getItem('cctv_config');
+    if (config) {
+      const parsed = JSON.parse(config);
+      return parsed.source || 'ktict';
+    }
+  } catch (e) {
+    console.error('Failed to parse CCTV config:', e);
+  }
+  return 'ktict';
+};
+
 export const fetchCCTVData = async (bounds: Bounds) => {
+  const source = getCCTVSource();
+  
   const { data } = await axios.get<CCTVResponse>('/api/cctv', {
     params: {
       minX: bounds.minX,
       maxX: bounds.maxX,
       minY: bounds.minY,
       maxY: bounds.maxY,
+      source: source,
     },
   });
   return data;
 };
 
 export const useCCTVData = (bounds: Bounds | null) => {
+  const source = getCCTVSource();
+  
   return useQuery({
-    queryKey: ['cctv', bounds],
+    queryKey: ['cctv', bounds, source], // source를 queryKey에 추가
     queryFn: () => fetchCCTVData(bounds!),
     enabled: !!bounds,
     staleTime: 1000 * 30, // 30초마다 갱신
@@ -55,7 +76,7 @@ export const useCCTVData = (bounds: Bounds | null) => {
         cctvUrl: item.cctvurl,
         imageUrl: item.imageUrl,
         direction: item.direction,
-        source: 'KTICT',
+        source: (item as any).source || 'KTICT',
         status: item.status === 'NORMAL' ? 'NORMAL' : 'ERROR',
       }));
     },

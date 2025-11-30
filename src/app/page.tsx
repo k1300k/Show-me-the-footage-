@@ -17,6 +17,7 @@ import { useFavorites } from '@/hooks/useFavorites';
 import ProgramInfo from '@/components/ProgramInfo';
 import AISettings from '@/components/AISettings';
 import UserGuide from '@/components/UserGuide';
+import CCTVSettings from '@/components/CCTVSettings';
 import MobileLayout from '@/components/MobileLayout';
 
 // Leaflet은 클라이언트 사이드에서만 로드
@@ -545,6 +546,7 @@ export default function HomePage() {
               </Button>
             </div>
             <UserGuide />
+            <CCTVSettings />
             <AISettings />
             <ProgramInfo />
             <Badge variant="default" className="bg-green-500 hidden sm:inline-flex">
