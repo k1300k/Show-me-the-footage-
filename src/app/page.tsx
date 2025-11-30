@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useCCTVData } from '@/hooks/useCCTVData';
+import { useDeviceDetect } from '@/hooks/useDeviceDetect';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +12,25 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import ImageViewer from '@/components/player/ImageViewer';
 import { CCTV } from '@/types';
-import { Star, Send, MessageSquare, Video, Search, Hash } from 'lucide-react';
+import { Star, Send, MessageSquare, Video, Search, Hash, Map as MapIcon, List } from 'lucide-react';
 import { useFavorites } from '@/hooks/useFavorites';
+import ProgramInfo from '@/components/ProgramInfo';
+import AISettings from '@/components/AISettings';
+import UserGuide from '@/components/UserGuide';
+import MobileLayout from '@/components/MobileLayout';
+
+// Leaflet은 클라이언트 사이드에서만 로드
+const MapContainer = dynamic(() => import('@/components/map/MapContainer'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full flex items-center justify-center bg-gray-100">
+      <div className="space-y-4 text-center">
+        <div className="w-[200px] h-[20px] bg-gray-300 rounded-full mx-auto animate-pulse" />
+        <p className="text-muted-foreground">지도를 불러오는 중...</p>
+      </div>
+    </div>
+  ),
+});
 
 interface Message {
   id: string;
@@ -107,10 +126,14 @@ const extractKeyword = (text: string): string => {
 };
 
 export default function HomePage() {
+  // 디바이스 감지
+  const deviceInfo = useDeviceDetect();
+  
   const [selectedCCTV, setSelectedCCTV] = useState<CCTV | null>(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
-  const [showCCTVList, setShowCCTVList] = useState(false);
+  const [showCCTVList, setShowCCTVList] = useState(true);
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [filteredCCTVs, setFilteredCCTVs] = useState<CCTV[]>([]);
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -179,7 +202,7 @@ export default function HomePage() {
   };
 
   // 검색 수행 함수 (공통 로직)
-  const performSearch = (keyword: string) => {
+  const performSearch = async (keyword: string) => {
     if (!keyword.trim()) return;
 
     const userMsg: Message = {
@@ -193,26 +216,82 @@ export default function HomePage() {
     setInputMessage('');
 
     if (allCCTVList) {
-      const results = allCCTVList.filter(cctv => 
+      // 1단계: CCTV 이름 직접 검색
+      const directResults = allCCTVList.filter(cctv => 
         cctv.name.includes(keyword) || 
         cctv.direction?.includes(keyword) ||
-        keyword.includes(cctv.name.split(' ')[0]) // 첫 단어 매칭
+        keyword.includes(cctv.name.split(' ')[0])
       );
 
-      setFilteredCCTVs(results);
-      setShowCCTVList(true);
+      if (directResults.length > 0) {
+        setFilteredCCTVs(directResults);
+        setShowCCTVList(true);
 
-      setTimeout(() => {
-        let responseText = '';
-        if (results.length > 0) {
-          responseText = `"${keyword}" 관련 CCTV ${results.length}곳을 찾았습니다.`;
-        } else {
-          responseText = `"${keyword}"에 대한 CCTV 정보를 찾을 수 없습니다. 다른 지역을 검색해보세요.`;
+        setTimeout(() => {
+          setMessages(prev => [...prev, {
+            id: Date.now().toString(),
+            text: `"${keyword}" 관련 CCTV ${directResults.length}곳을 찾았습니다.`,
+            timestamp: new Date(),
+            sender: 'system',
+          }]);
+        }, 500);
+        return;
+      }
+
+      // 2단계: 주소/지명으로 좌표 검색 (Geocoding)
+      try {
+        const response = await fetch(`/api/geocode?query=${encodeURIComponent(keyword)}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // 좌표 주변의 CCTV 검색 (반경 1km)
+          const lat = data.lat;
+          const lng = data.lng;
+          const radius = 0.01;
+          
+          const nearbyResults = allCCTVList.filter(cctv => {
+            const distance = Math.sqrt(
+              Math.pow(cctv.coord.lat - lat, 2) + 
+              Math.pow(cctv.coord.lng - lng, 2)
+            );
+            return distance <= radius;
+          });
+
+          if (nearbyResults.length > 0) {
+            setFilteredCCTVs(nearbyResults);
+            setShowCCTVList(true);
+            
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                text: `"${data.address}" 주변 CCTV ${nearbyResults.length}곳을 찾았습니다.`,
+                timestamp: new Date(),
+                sender: 'system',
+              }]);
+            }, 500);
+            return;
+          } else {
+            setTimeout(() => {
+              setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                text: `"${data.address}" 위치를 찾았지만 주변에 CCTV가 없습니다.`,
+                timestamp: new Date(),
+                sender: 'system',
+              }]);
+            }, 500);
+            return;
+          }
         }
+      } catch (error) {
+        console.error('Geocoding failed:', error);
+      }
 
+      // 3단계: 검색 실패
+      setTimeout(() => {
         setMessages(prev => [...prev, {
           id: Date.now().toString(),
-          text: responseText,
+          text: `"${keyword}"에 대한 CCTV 정보를 찾을 수 없습니다.\n(예: 강남역, 서초동, 테헤란로)`,
           timestamp: new Date(),
           sender: 'system',
         }]);
@@ -252,6 +331,165 @@ export default function HomePage() {
     }]);
   };
 
+  // 모바일 환경 렌더링
+  if (deviceInfo.isMobile) {
+    return (
+      <MobileLayout>
+        <div className="h-full flex flex-col bg-gray-50">
+          {/* 모바일 메시지 입력창 - 상단 고정 */}
+          <div className="bg-white border-b p-3 flex-shrink-0">
+            <div className="flex gap-2 mb-2">
+              <Input
+                placeholder="예: 강남역, 올림픽대로"
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                className="text-sm"
+              />
+              <Button size="sm" onClick={sendMessage}>
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+            {/* 해시태그 - 가로 스크롤 */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {hashtagKeywords.slice(0, 10).map((tag) => (
+                <button
+                  key={tag}
+                  onClick={() => handleHashtagClick(tag)}
+                  className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 border border-blue-200 whitespace-nowrap flex-shrink-0"
+                >
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* CCTV 그리드 - 스크롤 영역 */}
+          <div className="flex-1 overflow-y-auto p-3">
+            {isLoading ? (
+              <div className="grid grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <Card key={i}>
+                    <CardContent className="p-2 space-y-2">
+                      <Skeleton className="h-32 w-full" />
+                      <Skeleton className="h-3 w-3/4" />
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : filteredCCTVs.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {filteredCCTVs.map((cctv) => (
+                  <Card
+                    key={cctv.id}
+                    className="cursor-pointer active:scale-95 transition-transform"
+                    onClick={() => handleCCTVClick(cctv)}
+                  >
+                    <CardContent className="p-0">
+                      <div className="relative aspect-video bg-gray-900 rounded-t-lg overflow-hidden">
+                        <ImageViewer
+                          src={cctv.imageUrl}
+                          alt={cctv.name}
+                          autoRefresh={false}
+                        />
+                        {cctv.status === 'NORMAL' && (
+                          <Badge className="absolute top-1 right-1 text-xs bg-green-500">
+                            LIVE
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="p-2">
+                        <h3 className="font-semibold text-xs truncate" title={cctv.name}>
+                          {cctv.name}
+                        </h3>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 text-gray-500">
+                <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                <p className="text-sm">검색어를 입력해주세요</p>
+                <p className="text-xs mt-2">예: 강남역, 올림픽대로</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 모바일 CCTV 상세 시트 */}
+        <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
+          <SheetContent side="bottom" className="h-[85vh] rounded-t-2xl p-0">
+            <div className="p-4 h-full flex flex-col">
+              <SheetHeader className="mb-3 flex flex-row items-center justify-between space-y-0">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <SheetTitle className="text-base">{selectedCCTV?.name || 'CCTV'}</SheetTitle>
+                    {selectedCCTV?.status === 'NORMAL' && (
+                      <Badge variant="default" className="bg-green-500 text-xs">LIVE</Badge>
+                    )}
+                  </div>
+                  <SheetDescription className="text-xs">
+                    {showVideo ? '라이브 스트리밍' : '실시간 이미지 (5초 갱신)'}
+                  </SheetDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowVideo(!showVideo)}
+                    className="text-blue-500"
+                  >
+                    <Video className="w-5 h-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleFavorite}
+                    className="text-yellow-500"
+                  >
+                    {selectedCCTV && isFavorite(selectedCCTV.id) ? (
+                      <Star className="w-5 h-5 fill-current" />
+                    ) : (
+                      <Star className="w-5 h-5" />
+                    )}
+                  </Button>
+                </div>
+              </SheetHeader>
+              
+              <div className="flex-1 w-full bg-black rounded-lg overflow-hidden relative">
+                {selectedCCTV && isSheetOpen && !showVideo && (
+                  <ImageViewer 
+                    src={selectedCCTV.imageUrl} 
+                    alt={selectedCCTV.name}
+                    autoRefresh={true}
+                    refreshInterval={5000}
+                  />
+                )}
+                {selectedCCTV && isSheetOpen && showVideo && (
+                  <video 
+                    controls 
+                    autoPlay 
+                    playsInline
+                    className="w-full h-full"
+                    src={selectedCCTV.cctvUrl}
+                  >
+                    브라우저가 비디오 재생을 지원하지 않습니다.
+                  </video>
+                )}
+              </div>
+
+              <div className="mt-3 text-xs text-gray-500">
+                <p>ID: {selectedCCTV?.id} {selectedCCTV?.direction && `| ${selectedCCTV.direction}`}</p>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      </MobileLayout>
+    );
+  }
+
+  // 데스크톱 환경 렌더링
   return (
     <div className="h-screen flex flex-col bg-gray-50">
       {/* Header */}
@@ -261,89 +499,105 @@ export default function HomePage() {
             <h1 className="text-2xl font-bold text-gray-900">🎥 Show Me The CCTV</h1>
             <p className="text-sm text-gray-600">실시간 전국 CCTV 모니터링</p>
           </div>
-          <Badge variant="default" className="bg-green-500">
-            LIVE
-          </Badge>
+          <div className="flex items-center gap-2">
+            <div className="flex bg-gray-100 p-1 rounded-lg">
+              <Button
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className={`gap-2 ${viewMode === 'list' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+              >
+                <List className="w-4 h-4" />
+                목록
+              </Button>
+              <Button
+                variant={viewMode === 'map' ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('map')}
+                className={`gap-2 ${viewMode === 'map' ? 'bg-white shadow-sm' : 'text-gray-500'}`}
+              >
+                <MapIcon className="w-4 h-4" />
+                지도
+              </Button>
+            </div>
+            <UserGuide />
+            <AISettings />
+            <ProgramInfo />
+            <Badge variant="default" className="bg-green-500 hidden sm:inline-flex">
+              LIVE
+            </Badge>
+          </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full max-w-7xl mx-auto flex flex-col gap-4 p-4">
-          
-          {/* Top: Message Box */}
-          <Card className="flex flex-col h-64 md:h-80">
-            <CardHeader className="flex-shrink-0 pb-3">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <MessageSquare className="w-5 h-5" />
-                메시지
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="flex-1 flex flex-col min-h-0 p-4 pt-0">
-              {/* Messages */}
-              <div className="flex-1 overflow-y-auto space-y-3 mb-3">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                  >
+      <div className="flex-1 overflow-hidden relative">
+        {viewMode === 'list' ? (
+          <div className="h-full max-w-7xl mx-auto flex flex-col gap-4 p-4">
+            <Card className="flex flex-col h-64 md:h-80">
+              <CardHeader className="flex-shrink-0 pb-3">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <MessageSquare className="w-5 h-5" />
+                  메시지
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex-1 flex flex-col min-h-0 p-4 pt-0">
+                <div className="flex-1 overflow-y-auto space-y-3 mb-3">
+                  {messages.map((msg) => (
                     <div
-                      className={`max-w-[80%] rounded-lg p-3 ${
-                        msg.sender === 'user'
-                          ? 'bg-blue-500 text-white'
-                          : 'bg-gray-200 text-gray-900'
-                      }`}
+                      key={msg.id}
+                      className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <p className="text-sm">{msg.text}</p>
-                      <p className="text-xs mt-1 opacity-70">
-                        {msg.timestamp.toLocaleTimeString('ko-KR', {
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
-                      </p>
+                      <div
+                        className={`max-w-[80%] rounded-lg p-3 ${
+                          msg.sender === 'user'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-200 text-gray-900'
+                        }`}
+                      >
+                        <p className="text-sm">{msg.text}</p>
+                        <p className="text-xs mt-1 opacity-70">
+                          {msg.timestamp.toLocaleTimeString('ko-KR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Input */}
-              <div className="flex gap-2 flex-shrink-0 mb-2">
-                <Input
-                  placeholder="예: 강남역 보여줘, 성수대교 상황 어때?"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                />
-                <Button size="icon" onClick={sendMessage}>
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* 해시태그 영역 - CCTV 이름 기반 동적 생성 */}
-              <div className="flex-shrink-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <Hash className="w-3 h-3 text-gray-400" />
-                  <span className="text-xs text-gray-500">
-                    {isLoading ? '로딩 중...' : `추천 검색어 (${hashtagKeywords.length}개)`}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {hashtagKeywords.map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => handleHashtagClick(tag)}
-                      className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors border border-blue-200 active:scale-95"
-                    >
-                      #{tag}
-                    </button>
                   ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Bottom: CCTV List */}
-          {showCCTVList ? (
+                <div className="flex gap-2 flex-shrink-0 mb-2">
+                  <Input
+                    placeholder="예: 강남역 보여줘, 성수대교 상황 어때?"
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
+                  />
+                  <Button size="icon" onClick={sendMessage}>
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="flex-shrink-0">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Hash className="w-3 h-3 text-gray-400" />
+                    <span className="text-xs text-gray-500">
+                      {isLoading ? '로딩 중...' : `추천 검색어 (${hashtagKeywords.length}개)`}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {hashtagKeywords.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() => handleHashtagClick(tag)}
+                        className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors border border-blue-200 active:scale-95"
+                      >
+                        #{tag}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
             <Card className="flex-1 flex flex-col min-h-0">
               <CardHeader className="flex-shrink-0 pb-3">
                 <CardTitle className="text-lg">
@@ -389,7 +643,7 @@ export default function HomePage() {
                             </h3>
                             <p className="text-xs text-gray-500">ID: {cctv.id}</p>
                           </div>
-                      </CardContent>
+                        </CardContent>
                       </Card>
                     ))}
                   </div>
@@ -401,26 +655,12 @@ export default function HomePage() {
                 )}
               </CardContent>
             </Card>
-          ) : (
-            <Card className="flex-1 flex items-center justify-center">
-              <CardContent className="text-center space-y-4 py-20">
-                <Search className="w-16 h-16 mx-auto text-gray-400" />
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-700 mb-2">
-                    어디를 보고 싶으신가요?
-                  </h3>
-                  <p className="text-gray-500 mb-4">
-                    "강남역 보여줘", "올림픽대로 상황" 처럼<br/>
-                    자연스럽게 물어보세요!
-                  </p>
-                  <Button onClick={handleSearchClick} variant="outline">
-                    전체 목록 보기
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="w-full h-full">
+            <MapContainer />
+          </div>
+        )}
       </div>
 
       {/* CCTV Detail Sheet */}
@@ -490,7 +730,7 @@ export default function HomePage() {
               <p>출처: KT ICT CCTV</p>
               <p className="text-xs mt-1">ID: {selectedCCTV?.id} {selectedCCTV?.direction && `| ${selectedCCTV.direction}`}</p>
             </div>
-          </div>
+        </div>
         </SheetContent>
       </Sheet>
     </div>
