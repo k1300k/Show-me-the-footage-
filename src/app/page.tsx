@@ -187,9 +187,18 @@ export default function HomePage() {
     return sourceNames[cctvSource];
   };
 
-  // 국가표준링크 생성 함수
+  // 국가표준링크 생성 함수 (국가 ITS 표준 참조)
   const getStandardMapLinks = (lat: number, lng: number, name?: string) => {
+    // VWorld 기본 링크 (좌표 기반)
     const vworldLink = `https://map.vworld.kr/?q=${lat},${lng}`;
+    
+    // VWorld KSID 링크 (국가 ITS 표준: 경도, 위도 순서)
+    // 국가 ITS API는 coordx(경도), coordy(위도) 순서를 사용
+    const vworldKSIDLink = `https://map.vworld.kr/?q=KSID:${lng},${lat}`;
+    
+    // VWorld 좌표 기반 링크 (경도, 위도 순서 - 국가 ITS 표준)
+    const vworldCoordLink = `https://map.vworld.kr/?q=${lng},${lat}`;
+    
     const naverLink = `https://map.naver.com/v5/search/${encodeURIComponent(name || `${lat},${lng}`)}`;
     const kakaoLink = name 
       ? `https://map.kakao.com/link/map/${encodeURIComponent(name)},${lat},${lng}`
@@ -198,10 +207,25 @@ export default function HomePage() {
     
     return {
       vworld: vworldLink,
+      vworldKSID: vworldKSIDLink, // 국가 ITS 표준 KSID 링크
+      vworldCoord: vworldCoordLink, // 국가 ITS 표준 좌표 링크 (경도, 위도)
       naver: naverLink,
       kakao: kakaoLink,
       google: googleLink,
     };
+  };
+
+  // 링크 이름 매핑 함수
+  const getLinkName = (key: string): string => {
+    const linkNames: { [key: string]: string } = {
+      vworld: 'VWorld',
+      vworldKSID: 'KSID',
+      vworldCoord: 'VWorld좌표',
+      naver: '네이버',
+      kakao: '카카오',
+      google: '구글',
+    };
+    return linkNames[key] || key;
   };
 
   // CCTV 목록에서 해시태그 키워드 추출
@@ -566,17 +590,27 @@ export default function HomePage() {
                     </div>
                     <div className="flex items-center gap-1 flex-wrap">
                       <span className="text-[10px] text-gray-500">국가표준링크:</span>
-                      {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => (
-                        <a
-                          key={key}
-                          href={url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-blue-600 hover:text-blue-800 underline px-1"
-                        >
-                          {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
-                        </a>
-                      ))}
+                      {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => {
+                        const linkNames: { [key: string]: string } = {
+                          vworld: 'VWorld',
+                          vworldKSID: 'KSID',
+                          vworldCoord: 'VWorld좌표',
+                          naver: '네이버',
+                          kakao: '카카오',
+                          google: '구글',
+                        };
+                        return (
+                          <a
+                            key={key}
+                            href={url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-blue-600 hover:text-blue-800 underline px-1"
+                          >
+                            {linkNames[key] || key}
+                          </a>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
@@ -640,7 +674,7 @@ export default function HomePage() {
                                 onClick={(e) => e.stopPropagation()}
                                 className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
                               >
-                                {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                                {getLinkName(key)}
                               </a>
                             ))}
                           </div>
@@ -913,17 +947,27 @@ export default function HomePage() {
                         </div>
                         <div className="flex items-center gap-2 text-xs text-gray-500 ml-4">
                           <span>국가표준링크:</span>
-                          {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => (
-                            <a
-                              key={key}
-                              href={url}
+                          {Object.entries(getStandardMapLinks(location.lat, location.lng, currentAddress)).map(([key, url]) => {
+                            const linkNames: { [key: string]: string } = {
+                              vworld: 'VWorld',
+                              vworldKSID: 'KSID',
+                              vworldCoord: 'VWorld좌표',
+                              naver: '네이버',
+                              kakao: '카카오',
+                              google: '구글',
+                            };
+                            return (
+                              <a
+                                key={key}
+                                href={url}
             target="_blank"
             rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
-                            </a>
-                          ))}
+                                className="text-blue-600 hover:text-blue-800 hover:underline"
+                              >
+                                {linkNames[key] || key}
+                              </a>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
@@ -990,7 +1034,7 @@ export default function HomePage() {
                                   onClick={(e) => e.stopPropagation()}
                                   className="text-[10px] text-blue-600 hover:text-blue-800 hover:underline"
                                 >
-                                  {key === 'vworld' ? 'VWorld' : key === 'naver' ? '네이버' : key === 'kakao' ? '카카오' : '구글'}
+                                  {getLinkName(key)}
                                 </a>
                               ))}
                             </div>
