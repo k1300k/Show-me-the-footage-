@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Home, Map, Star, Settings, BookOpen, Info } from 'lucide-react';
@@ -10,10 +9,11 @@ import ProgramInfo from '@/components/ProgramInfo';
 
 interface MobileLayoutProps {
   children: React.ReactNode;
+  viewMode: 'list' | 'map';
+  onViewModeChange: (mode: 'list' | 'map') => void;
 }
 
-export default function MobileLayout({ children }: MobileLayoutProps) {
-  const [activeTab, setActiveTab] = useState<'home' | 'map' | 'favorites'>('home');
+export default function MobileLayout({ children, viewMode, onViewModeChange }: MobileLayoutProps) {
 
   return (
     <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
@@ -43,41 +43,36 @@ export default function MobileLayout({ children }: MobileLayoutProps) {
       <div className="bg-white border-t shadow-lg flex-shrink-0 safe-area-bottom">
         <div className="grid grid-cols-3 h-16">
           <button
-            onClick={() => setActiveTab('home')}
+            onClick={() => onViewModeChange('list')}
             className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-              activeTab === 'home' 
+              viewMode === 'list' 
                 ? 'text-blue-600' 
                 : 'text-gray-500'
             }`}
           >
-            <Home className={`w-6 h-6 ${activeTab === 'home' ? 'fill-current' : ''}`} />
+            <Home className={`w-6 h-6 ${viewMode === 'list' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">홈</span>
           </button>
           
           <button
-            onClick={() => setActiveTab('map')}
+            onClick={() => onViewModeChange('map')}
             className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-              activeTab === 'map' 
+              viewMode === 'map' 
                 ? 'text-blue-600' 
                 : 'text-gray-500'
             }`}
           >
-            <Map className={`w-6 h-6 ${activeTab === 'map' ? 'fill-current' : ''}`} />
+            <Map className={`w-6 h-6 ${viewMode === 'map' ? 'fill-current' : ''}`} />
             <span className="text-xs font-medium">지도</span>
           </button>
           
           <button
             onClick={() => {
-              setActiveTab('favorites');
               window.location.href = '/favorites';
             }}
-            className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-              activeTab === 'favorites' 
-                ? 'text-blue-600' 
-                : 'text-gray-500'
-            }`}
+            className="flex flex-col items-center justify-center gap-1 transition-colors text-gray-500"
           >
-            <Star className={`w-6 h-6 ${activeTab === 'favorites' ? 'fill-current' : ''}`} />
+            <Star className="w-6 h-6" />
             <span className="text-xs font-medium">즐겨찾기</span>
           </button>
         </div>

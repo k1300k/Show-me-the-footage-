@@ -334,38 +334,45 @@ export default function HomePage() {
   // 모바일 환경 렌더링
   if (deviceInfo.isMobile) {
     return (
-      <MobileLayout>
-        <div className="h-full flex flex-col bg-gray-50">
-          {/* 모바일 메시지 입력창 - 상단 고정 */}
-          <div className="bg-white border-b p-3 flex-shrink-0">
-            <div className="flex gap-2 mb-2">
-              <Input
-                placeholder="예: 강남역, 올림픽대로"
-                value={inputMessage}
-                onChange={(e) => setInputMessage(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
-                className="text-sm"
-              />
-              <Button size="sm" onClick={sendMessage}>
-                <Send className="w-4 h-4" />
-              </Button>
-            </div>
-            {/* 해시태그 - 가로 스크롤 */}
-            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-              {hashtagKeywords.slice(0, 10).map((tag) => (
-                <button
-                  key={tag}
-                  onClick={() => handleHashtagClick(tag)}
-                  className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 border border-blue-200 whitespace-nowrap flex-shrink-0"
-                >
-                  #{tag}
-                </button>
-              ))}
-            </div>
+      <MobileLayout viewMode={viewMode} onViewModeChange={setViewMode}>
+        {viewMode === 'map' ? (
+          // 지도 뷰
+          <div className="h-full w-full">
+            <MapContainer />
           </div>
+        ) : (
+          // 목록 뷰
+          <div className="h-full flex flex-col bg-gray-50">
+            {/* 모바일 메시지 입력창 - 상단 고정 */}
+            <div className="bg-white border-b p-3 flex-shrink-0">
+              <div className="flex gap-2 mb-2">
+                <Input
+                  placeholder="예: 강남역, 올림픽대로"
+                  value={inputMessage}
+                  onChange={(e) => setInputMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+                  className="text-sm"
+                />
+                <Button size="sm" onClick={sendMessage}>
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+              {/* 해시태그 - 가로 스크롤 */}
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+                {hashtagKeywords.slice(0, 10).map((tag) => (
+                  <button
+                    key={tag}
+                    onClick={() => handleHashtagClick(tag)}
+                    className="px-3 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-600 border border-blue-200 whitespace-nowrap flex-shrink-0"
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* CCTV 그리드 - 스크롤 영역 */}
-          <div className="flex-1 overflow-y-auto p-3">
+            {/* CCTV 그리드 - 스크롤 영역 */}
+            <div className="flex-1 overflow-y-auto p-3">
             {isLoading ? (
               <div className="grid grid-cols-2 gap-3">
                 {[1, 2, 3, 4].map((i) => (
@@ -414,8 +421,9 @@ export default function HomePage() {
                 <p className="text-xs mt-2">예: 강남역, 올림픽대로</p>
               </div>
             )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* 모바일 CCTV 상세 시트 */}
         <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
